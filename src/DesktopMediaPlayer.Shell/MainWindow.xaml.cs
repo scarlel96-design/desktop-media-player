@@ -868,6 +868,83 @@ public partial class MainWindow : Window, IPlaybackObserver
         Dispatcher.Invoke(() => ApplyTimeline(positionSeconds, durationSeconds));
     }
 
+
+    // --- S7 ---
+
+    private void FrameStep_Click(object sender, RoutedEventArgs e)
+    {
+        _facade?.FrameStep(1);
+        _facade?.Pause();
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void FrameBack_Click(object sender, RoutedEventArgs e)
+    {
+        _facade?.FrameStep(-1);
+        _facade?.Pause();
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void Screenshot_Click(object sender, RoutedEventArgs e)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "Save screenshot",
+            Filter = "PNG image|*.png|JPEG image|*.jpg",
+            FileName = $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.png"
+        };
+        if (dlg.ShowDialog(this) == true)
+        {
+            _facade.Screenshot(dlg.FileName);
+            StatusText.Text = $"Screenshot → {dlg.FileName}";
+        }
+    }
+
+    private void Info_Click(object sender, RoutedEventArgs e)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        if (MediaInfoFlyout.Visibility == Visibility.Visible)
+        {
+            MediaInfoFlyout.Visibility = Visibility.Collapsed;
+            ArmAutoHide();
+            return;
+        }
+
+        var info = _facade.GetMediaInfo();
+        MediaInfoText.Text =
+            $"Path: {info.Path ?? "-"}
+" +
+            $"Title: {info.Title ?? "-"}
+" +
+            $"Format: {info.Format ?? "-"}
+" +
+            $"Video: {info.VideoCodec ?? "-"} {info.Width}x{info.Height}
+" +
+            $"Audio: {info.AudioCodec ?? "-"}
+" +
+            $"Duration: {FormatTime(info.DurationSeconds, info.DurationSeconds > 0)}";
+        MediaInfoFlyout.Visibility = Visibility.Visible;
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void CloseInfo_Click(object sender, RoutedEventArgs e)
+    {
+        MediaInfoFlyout.Visibility = Visibility.Collapsed;
+        ArmAutoHide();
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         PersistResume();
