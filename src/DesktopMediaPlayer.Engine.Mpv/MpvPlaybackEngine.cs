@@ -294,7 +294,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return;
         }
 
-        var escaped = path.Replace("", "/", StringComparison.Ordinal).Replace(""", """, StringComparison.Ordinal);
+        var escaped = path.Replace("\\", "/", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
         Check(MpvNative.mpv_command_string(_mpv, $"sub-add \"{escaped}\""), "sub-add");
     });
 
@@ -317,7 +317,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return;
         }
 
-        var escaped = path.Replace("", "/", StringComparison.Ordinal).Replace(""", """, StringComparison.Ordinal);
+        var escaped = path.Replace("\\", "/", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
         Check(MpvNative.mpv_command_string(_mpv, $"screenshot-to-file \"{escaped}\""), "screenshot-to-file");
     });
 
