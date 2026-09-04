@@ -15,11 +15,11 @@ public sealed class VideoHwndHost : HwndHost
     private const int MaNoActivate = 3;
 
     /// <summary>Child STATIC HWND handle (same as Host handle after build).</summary>
-    public nint Handle { get; private set; }
+    public nint ChildHwnd { get; private set; }
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {
-        Handle = CreateWindowEx(
+        ChildHwnd = CreateWindowEx(
             0,
             "STATIC",
             string.Empty,
@@ -33,7 +33,7 @@ public sealed class VideoHwndHost : HwndHost
             nint.Zero,
             nint.Zero);
 
-        return new HandleRef(this, Handle);
+        return new HandleRef(this, ChildHwnd);
     }
 
     protected override void DestroyWindowCore(HandleRef hwnd)
@@ -43,7 +43,7 @@ public sealed class VideoHwndHost : HwndHost
             DestroyWindow(hwnd.Handle);
         }
 
-        Handle = nint.Zero;
+        ChildHwnd = nint.Zero;
     }
 
     protected override nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)

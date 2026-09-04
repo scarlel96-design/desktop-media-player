@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using DesktopMediaPlayer.Contracts;
 using DesktopMediaPlayer.Playback;
 using Microsoft.Win32;
@@ -7,20 +8,31 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A S1: UX-001 Control Bar skeleton over video host.
-/// Calls <see cref="PlaybackFacade"/> only — never mpv P/Invoke. Blur OFF.
+/// Phase A S1–S2: UX-001 chrome + timeline time/seek binding via Facade.
+/// Never calls mpv P/Invoke. Blur OFF.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
 {
+    private readonly DispatcherTimer _positionTimer;
     private PlaybackFacade? _facade;
     private bool _renderAttached;
+    private bool _seekDragging;
+    private double _durationSeconds;
 
     public MainWindow()
     {
         InitializeComponent();
+        _positionTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _positionTimer.Tick += (_, _) => PollPosition();
+
         Loaded += OnLoaded;
         SizeChanged += (_, _) => ResizeRenderHost();
         DpiChanged += (_, _) => ResizeRenderHost();
+        SeekSlider.PreviewMouseLeftButtonDown += (_, _) => _seekDragging = true;
+        SeekSlider.PreviewMouseLeftButtonUp += (_, _) => _seekDragging = false;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -39,6 +51,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         TryAttachRenderHost();
         ResizeRenderHost();
+        UpdateTimeLabels(0, 0);
 
         if (!_facade.TryProbe(out var detail))
         {
@@ -59,10 +72,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             return;
         }
 
-        var hwnd = VideoHost.Handle;
+        var hwnd = VideoHost.ChildHwnd;
         if (hwnd == nint.Zero)
         {
-            Dispatcher.BeginInvoke(TryAttachRenderHost, System.Windows.Threading.DispatcherPriority.Loaded);
+            Dispatcher.BeginInvoke(TryAttachRenderHost, DispatcherPriority.Loaded);
             return;
         }
 
@@ -99,12 +112,27 @@ public partial class MainWindow : Window, IPlaybackObserver
             ErrorText.Visibility = Visibility.Collapsed;
             TryAttachRenderHost();
             _facade?.Open(dlg.FileName);
+            _positionTimer.Start();
         }
     }
 
-    private void Play_Click(object sender, RoutedEventArgs e) => _facade?.Play();
+    private void Play_Click(object sender, RoutedEventArgs e)
+    {
+        _facade?.Play();
+        _positionTimer.Start();
+    }
+
     private void Pause_Click(object sender, RoutedEventArgs e) => _facade?.Pause();
-    private void Stop_Click(object sender, RoutedEventArgs e) => _facade?.Stop();
+
+    private void Stop_Click(object sender, RoutedEventArgs e)
+    {
+        _facade?.Stop();
+        UpdateTimeLabels(0, _durationSeconds);
+        if (!_seekDragging)
+        {
+            SeekSlider.Value = 0;
+        }
+    }
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -116,13 +144,82 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.SetVolume((int)Math.Round(e.NewValue));
     }
 
-    private void SeekSlider_Committed(object sender, System.Windows.Input.MouseButtonEventArgs e) => CommitSeek();
+    private void SeekSlider_Committed(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        _seekDragging = false;
+        CommitSeek();
+    }
 
-    private void SeekSlider_LostCapture(object sender, System.Windows.Input.MouseEventArgs e) => CommitSeek();
+    private void SeekSlider_LostCapture(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        _seekDragging = false;
+        CommitSeek();
+    }
 
     private void CommitSeek()
     {
-        _facade?.Seek(SeekSlider.Value);
+        if (_facade is null)
+        {
+            return;
+        }
+
+        // Slider Maximum tracks duration seconds when known.
+        _facade.Seek(SeekSlider.Value);
+    }
+
+    private void PollPosition()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var state = _facade.GetState();
+        if (state is PlaybackState.Idle or PlaybackState.Stopped or PlaybackState.Error)
+        {
+            return;
+        }
+
+        var pos = _facade.GetPosition();
+        var dur = _facade.GetDuration();
+        ApplyTimeline(pos, dur);
+    }
+
+    private void ApplyTimeline(double positionSeconds, double durationSeconds)
+    {
+        _durationSeconds = durationSeconds > 0 ? durationSeconds : _durationSeconds;
+        UpdateTimeLabels(positionSeconds, _durationSeconds);
+
+        if (_seekDragging)
+        {
+            return;
+        }
+
+        if (_durationSeconds > 0)
+        {
+            SeekSlider.Maximum = _durationSeconds;
+            SeekSlider.Value = Math.Clamp(positionSeconds, 0, _durationSeconds);
+        }
+    }
+
+    private void UpdateTimeLabels(double positionSeconds, double durationSeconds)
+    {
+        CurrentTimeText.Text = FormatTime(positionSeconds, durationKnown: durationSeconds > 0 || positionSeconds > 0);
+        TotalTimeText.Text = FormatTime(durationSeconds, durationKnown: durationSeconds > 0);
+    }
+
+    private static string FormatTime(double seconds, bool durationKnown)
+    {
+        if (!durationKnown || double.IsNaN(seconds) || seconds < 0)
+        {
+            return "--:--";
+        }
+
+        var whole = (int)Math.Floor(seconds);
+        var h = whole / 3600;
+        var m = (whole % 3600) / 60;
+        var s = whole % 60;
+        return h > 0 ? $"{h}:{m:00}:{s:00}" : $"{m:00}:{s:00}";
     }
 
     private void ShowError(string message)
@@ -138,12 +235,21 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             StatusText.Text = "First frame";
             ResizeRenderHost();
+            _positionTimer.Start();
+            PollPosition();
         });
     }
 
     public void OnStateChanged(PlaybackState state)
     {
-        Dispatcher.Invoke(() => StatusText.Text = $"State: {state}");
+        Dispatcher.Invoke(() =>
+        {
+            StatusText.Text = $"State: {state}";
+            if (state is PlaybackState.Playing or PlaybackState.Opening or PlaybackState.Paused)
+            {
+                _positionTimer.Start();
+            }
+        });
     }
 
     public void OnError(string code, string message, bool recoverable)
@@ -163,11 +269,12 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     public void OnPositionChanged(double positionSeconds, double durationSeconds)
     {
-        // Wired in S2 timeline; keep no-op for S0 Shell.
+        Dispatcher.Invoke(() => ApplyTimeline(positionSeconds, durationSeconds));
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        _positionTimer.Stop();
         try
         {
             _facade?.RenderHost?.Detach();
