@@ -90,11 +90,15 @@
                     Click="Next_Click" IsEnabled="False" Margin="0,0,16,0"/>
           </StackPanel>
 
-          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
+          <!-- S4: mute 40×40 + compact volume 88–104 (UX-001 AC-UI-3) -->
+          <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
+                      DockPanel.Dock="Left" Margin="0,0,16,0"
+                      PreviewMouseWheel="VolumeGroup_PreviewMouseWheel">
             <Button x:Name="MuteButton" Style="{StaticResource TransportButton}"
-                    Content="🔊" ToolTip="Mute (S4)" IsEnabled="False"/>
+                    Content="🔊" ToolTip="Mute"
+                    Click="Mute_Click"/>
             <Slider x:Name="VolumeSlider"
-                    Width="96"
+                    Width="96" MinWidth="88" MaxWidth="104"
                     Minimum="0" Maximum="100" Value="80"
                     VerticalAlignment="Center"
                     TickFrequency="1" IsSnapToTickEnabled="True"

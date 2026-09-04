@@ -19,6 +19,8 @@ public partial class MainWindow : Window, IPlaybackObserver
     private bool _renderAttached;
     private bool _seekDragging;
     private double _durationSeconds;
+    private int _lastAudibleVolume = 80;
+    private bool _muteUi;
 
     public MainWindow()
     {
@@ -50,7 +52,10 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.AddObserver(this);
         RefreshTransportEnabled();
         VolumeSlider.Value = 80;
+        _lastAudibleVolume = 80;
         _facade.SetVolume(80);
+        _facade.SetMute(false);
+        RefreshMuteGlyph();
 
         TryAttachRenderHost();
         ResizeRenderHost();
@@ -183,7 +188,57 @@ public partial class MainWindow : Window, IPlaybackObserver
             return;
         }
 
-        _facade.SetVolume((int)Math.Round(e.NewValue));
+        var volume = (int)Math.Round(e.NewValue);
+        _facade.SetVolume(volume);
+        if (volume > 0)
+        {
+            _lastAudibleVolume = volume;
+            if (_muteUi)
+            {
+                _facade.SetMute(false);
+                _muteUi = false;
+            }
+        }
+
+        RefreshMuteGlyph();
+    }
+
+    private void Mute_Click(object sender, RoutedEventArgs e)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        _muteUi = !_muteUi;
+        _facade.SetMute(_muteUi);
+        if (_muteUi)
+        {
+            if (VolumeSlider.Value > 0)
+            {
+                _lastAudibleVolume = (int)Math.Round(VolumeSlider.Value);
+            }
+        }
+        else if (VolumeSlider.Value <= 0)
+        {
+            VolumeSlider.Value = Math.Clamp(_lastAudibleVolume, 1, 100);
+        }
+
+        RefreshMuteGlyph();
+    }
+
+    private void VolumeGroup_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        var delta = e.Delta > 0 ? 5 : -5;
+        VolumeSlider.Value = Math.Clamp(VolumeSlider.Value + delta, 0, 100);
+        e.Handled = true;
+    }
+
+    private void RefreshMuteGlyph()
+    {
+        var muted = _muteUi || VolumeSlider.Value <= 0;
+        MuteButton.Content = muted ? "🔇" : "🔊";
+        MuteButton.ToolTip = muted ? "Unmute" : "Mute";
     }
 
     private void SeekSlider_Committed(object sender, System.Windows.Input.MouseButtonEventArgs e)
