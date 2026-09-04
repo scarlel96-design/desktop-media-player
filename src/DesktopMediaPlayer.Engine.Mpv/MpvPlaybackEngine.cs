@@ -261,8 +261,48 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public IReadOnlyList<MediaTrackInfo> ListTracks()
     {
-        // Skeleton: full track enumeration lands with S5 subtitle/audio UI.
-        return Array.Empty<MediaTrackInfo>();
+        if (_mpv == nint.Zero)
+        {
+            return Array.Empty<MediaTrackInfo>();
+        }
+
+        var countRaw = MpvNative.GetPropertyAndFree(_mpv, "track-list/count");
+        if (!int.TryParse(countRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) || count <= 0)
+        {
+            return Array.Empty<MediaTrackInfo>();
+        }
+
+        var list = new List<MediaTrackInfo>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var type = MpvNative.GetPropertyAndFree(_mpv, $"track-list/{i}/type") ?? string.Empty;
+            var kind = type.ToLowerInvariant() switch
+            {
+                "audio" => MediaTrackKind.Audio,
+                "sub" or "subtitle" => MediaTrackKind.Subtitle,
+                "video" => MediaTrackKind.Video,
+                _ => (MediaTrackKind?)null
+            };
+            if (kind is null)
+            {
+                continue;
+            }
+
+            var idRaw = MpvNative.GetPropertyAndFree(_mpv, $"track-list/{i}/id");
+            if (!int.TryParse(idRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+            {
+                continue;
+            }
+
+            var title = MpvNative.GetPropertyAndFree(_mpv, $"track-list/{i}/title");
+            var lang = MpvNative.GetPropertyAndFree(_mpv, $"track-list/{i}/lang");
+            var selectedRaw = MpvNative.GetPropertyAndFree(_mpv, $"track-list/{i}/selected");
+            var selected = string.Equals(selectedRaw, "yes", StringComparison.OrdinalIgnoreCase)
+                           || string.Equals(selectedRaw, "true", StringComparison.OrdinalIgnoreCase);
+            list.Add(new MediaTrackInfo(kind.Value, id, title, lang, selected));
+        }
+
+        return list;
     }
 
     public void SelectTrack(MediaTrackKind kind, int id) => Post(() =>
@@ -284,7 +324,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return;
         }
 
-        Check(MpvNative.mpv_set_property_string(_mpv, prop, id.ToString(CultureInfo.InvariantCulture)), prop);
+        var value = id <= 0 ? "no" : id.ToString(CultureInfo.InvariantCulture);
+        Check(MpvNative.mpv_set_property_string(_mpv, prop, value), prop);
     });
 
     public void LoadExternalSubtitle(string path) => Post(() =>

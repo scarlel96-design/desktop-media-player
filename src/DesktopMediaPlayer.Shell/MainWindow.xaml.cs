@@ -1,4 +1,7 @@
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using DesktopMediaPlayer.Contracts;
@@ -8,8 +11,8 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A S1–S2: UX-001 chrome + timeline time/seek binding via Facade.
-/// Never calls mpv P/Invoke. Blur OFF.
+/// Phase A S1–S5: UX-001 chrome, timeline, transport, volume, FS/Sub/Audio/Playlist.
+/// Facade-only. Blur OFF. Subtitles via engine tracks (no UI overlay path).
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
 {
@@ -21,6 +24,10 @@ public partial class MainWindow : Window, IPlaybackObserver
     private double _durationSeconds;
     private int _lastAudibleVolume = 80;
     private bool _muteUi;
+    private MediaTrackKind? _flyoutKind;
+    private bool _suppressTrackSelection;
+    private WindowState _windowStateBeforeFullscreen = WindowState.Normal;
+    private WindowStyle _windowStyleBeforeFullscreen = WindowStyle.SingleBorderWindow;
 
     public MainWindow()
     {
@@ -334,6 +341,12 @@ public partial class MainWindow : Window, IPlaybackObserver
             ResizeRenderHost();
             _positionTimer.Start();
             PollPosition();
+            if (_flyoutKind is MediaTrackKind kind)
+            {
+                PopulateTrackList(kind);
+            }
+
+            RefreshPlaylistUi();
         });
     }
 
@@ -348,6 +361,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             }
 
             RefreshTransportEnabled();
+            RefreshPlaylistUi();
         });
     }
 
@@ -369,6 +383,197 @@ public partial class MainWindow : Window, IPlaybackObserver
     public void OnPositionChanged(double positionSeconds, double durationSeconds)
     {
         Dispatcher.Invoke(() => ApplyTimeline(positionSeconds, durationSeconds));
+    }
+
+
+    // --- S5: FS / Sub / Audio / Playlist ---
+
+    private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
+
+    private void VideoArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            ToggleFullscreen();
+            e.Handled = true;
+        }
+    }
+
+    private void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F11 || (e.Key == Key.Escape && WindowStyle == WindowStyle.None))
+        {
+            ToggleFullscreen();
+            e.Handled = true;
+        }
+    }
+
+    private void ToggleFullscreen()
+    {
+        if (WindowStyle != WindowStyle.None)
+        {
+            _windowStateBeforeFullscreen = WindowState;
+            _windowStyleBeforeFullscreen = WindowStyle;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Maximized;
+            FullscreenButton.ToolTip = "Exit fullscreen";
+        }
+        else
+        {
+            WindowStyle = _windowStyleBeforeFullscreen;
+            ResizeMode = ResizeMode.CanResize;
+            WindowState = _windowStateBeforeFullscreen;
+            FullscreenButton.ToolTip = "Fullscreen";
+        }
+
+        Dispatcher.BeginInvoke(ResizeRenderHost, DispatcherPriority.Loaded);
+    }
+
+    private void Sub_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleTrackFlyout(MediaTrackKind.Subtitle, "Subtitles (engine layer)");
+        LoadSubButton.Visibility = Visibility.Visible;
+    }
+
+    private void Audio_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleTrackFlyout(MediaTrackKind.Audio, "Audio tracks");
+        LoadSubButton.Visibility = Visibility.Collapsed;
+    }
+
+    private void CloseTrackFlyout_Click(object sender, RoutedEventArgs e)
+    {
+        TrackFlyout.Visibility = Visibility.Collapsed;
+        _flyoutKind = null;
+    }
+
+    private void ToggleTrackFlyout(MediaTrackKind kind, string title)
+    {
+        if (_flyoutKind == kind && TrackFlyout.Visibility == Visibility.Visible)
+        {
+            TrackFlyout.Visibility = Visibility.Collapsed;
+            _flyoutKind = null;
+            return;
+        }
+
+        _flyoutKind = kind;
+        TrackFlyoutTitle.Text = title;
+        PopulateTrackList(kind);
+        TrackFlyout.Visibility = Visibility.Visible;
+        PlaylistPanel.Visibility = Visibility.Collapsed;
+        SideColumn.Width = new GridLength(0);
+    }
+
+    private void PopulateTrackList(MediaTrackKind kind)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        _suppressTrackSelection = true;
+        TrackList.Items.Clear();
+        TrackList.Items.Add(new TrackListItem("Off", id: 0, kind));
+        foreach (var track in _facade.ListTracks().Where(t => t.Kind == kind))
+        {
+            var label = $"{track.Id}: {track.Title ?? track.Language ?? kind.ToString()}";
+            var item = new TrackListItem(label, track.Id, kind);
+            TrackList.Items.Add(item);
+            if (track.IsSelected)
+            {
+                TrackList.SelectedItem = item;
+            }
+        }
+
+        _suppressTrackSelection = false;
+    }
+
+    private void TrackList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressTrackSelection || _facade is null || TrackList.SelectedItem is not TrackListItem item)
+        {
+            return;
+        }
+
+        _facade.SelectTrack(item.Kind, item.Id);
+        StatusText.Text = $"Selected {item.Kind} #{item.Id}";
+    }
+
+    private void LoadExternalSub_Click(object sender, RoutedEventArgs e)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var dlg = new OpenFileDialog
+        {
+            Title = "Load external subtitle",
+            Filter = "Subtitles|*.srt;*.ass;*.ssa;*.vtt;*.sub|All files|*.*"
+        };
+        if (dlg.ShowDialog(this) == true)
+        {
+            _facade.LoadExternalSubtitle(dlg.FileName);
+            PopulateTrackList(MediaTrackKind.Subtitle);
+        }
+    }
+
+    private void Playlist_Click(object sender, RoutedEventArgs e)
+    {
+        var open = PlaylistPanel.Visibility != Visibility.Visible;
+        PlaylistPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        SideColumn.Width = open ? new GridLength(300) : new GridLength(0);
+        if (open)
+        {
+            TrackFlyout.Visibility = Visibility.Collapsed;
+            _flyoutKind = null;
+            RefreshPlaylistUi();
+        }
+    }
+
+    private void PlaylistList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_playlist is null || PlaylistList.SelectedIndex < 0)
+        {
+            return;
+        }
+
+        _playlist.PlayAt(PlaylistList.SelectedIndex);
+        RefreshTransportEnabled();
+        _positionTimer.Start();
+    }
+
+    private void RefreshPlaylistUi()
+    {
+        if (_playlist is null)
+        {
+            return;
+        }
+
+        PlaylistList.Items.Clear();
+        var items = _playlist.Items;
+        PlaylistEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        for (var i = 0; i < items.Count; i++)
+        {
+            var marker = i == _playlist.CurrentIndex ? "▶ " : "  ";
+            PlaylistList.Items.Add($"{marker}{System.IO.Path.GetFileName(items[i])}");
+        }
+    }
+
+    private sealed class TrackListItem
+    {
+        public TrackListItem(string label, int id, MediaTrackKind kind)
+        {
+            Label = label;
+            Id = id;
+            Kind = kind;
+        }
+
+        public string Label { get; }
+        public int Id { get; }
+        public MediaTrackKind Kind { get; }
+        public override string ToString() => Label;
     }
 
     protected override void OnClosed(EventArgs e)

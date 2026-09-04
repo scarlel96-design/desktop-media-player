@@ -8,8 +8,9 @@
         Background="#121212"
         Foreground="#F0F0F0"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
-  <!-- S1: UX-001 Control Bar skeleton. Blur OFF. L1≤2. Facade-only wiring. -->
+        SnapsToDevicePixels="True"
+        KeyDown="Window_KeyDown">
+  <!-- S1–S5: UX-001 chrome. Blur OFF. L1≤2. Facade-only. -->
   <Window.Resources>
     <Style x:Key="TransportButton" TargetType="Button">
       <Setter Property="Width" Value="40"/>
@@ -29,99 +30,145 @@
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="Foreground" Value="#C8C8C8"/>
     </Style>
+    <Style x:Key="SidePanel" TargetType="Border">
+      <Setter Property="Background" Value="#F0121212"/>
+      <Setter Property="BorderBrush" Value="#3A3A3A"/>
+      <Setter Property="BorderThickness" Value="1,0,0,0"/>
+      <Setter Property="Padding" Value="12"/>
+    </Style>
   </Window.Resources>
 
   <Grid>
-    <!-- L0 video -->
-    <Border Background="#000000">
-      <local:VideoHwndHost x:Name="VideoHost"/>
-    </Border>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition x:Name="SideColumn" Width="0"/>
+    </Grid.ColumnDefinitions>
 
-    <!-- L1 bottom chrome ≈92px (8 pad + 28 timeline + 8 gap + 48 controls) -->
-    <Border x:Name="BottomChrome"
-            VerticalAlignment="Bottom"
-            Background="#E6121212"
-            Padding="16,8,16,8">
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="28"/>
-          <RowDefinition Height="8"/>
-          <RowDefinition Height="48"/>
-        </Grid.RowDefinitions>
+    <Grid Grid.Column="0">
+      <!-- L0 video -->
+      <Border Background="#000000"
+              MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
+        <local:VideoHwndHost x:Name="VideoHost"/>
+      </Border>
 
-        <!-- Timeline row (S2 wires Seek + buffer/hover). Hit ≥24 via MinHeight. -->
-        <Grid Grid.Row="0" MinHeight="24">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-          <TextBlock x:Name="CurrentTimeText" Grid.Column="0"
-                     Style="{StaticResource ChromeCaption}"
-                     Text="--:--" Margin="0,0,12,0"/>
-          <Slider x:Name="SeekSlider" Grid.Column="1"
-                  Minimum="0" Maximum="3600" Value="0"
-                  VerticalAlignment="Center"
-                  Height="24"
-                  IsMoveToPointEnabled="True"
-                  PreviewMouseLeftButtonUp="SeekSlider_Committed"
-                  LostMouseCapture="SeekSlider_LostCapture"/>
-          <TextBlock x:Name="TotalTimeText" Grid.Column="2"
-                     Style="{StaticResource ChromeCaption}"
-                     Text="--:--" Margin="12,0,0,0"/>
+      <!-- L1 bottom chrome -->
+      <Border x:Name="BottomChrome"
+              VerticalAlignment="Bottom"
+              Background="#E6121212"
+              Padding="16,8,16,8">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="28"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="48"/>
+          </Grid.RowDefinitions>
+
+          <Grid Grid.Row="0" MinHeight="24">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="CurrentTimeText" Grid.Column="0"
+                       Style="{StaticResource ChromeCaption}"
+                       Text="--:--" Margin="0,0,12,0"/>
+            <Slider x:Name="SeekSlider" Grid.Column="1"
+                    Minimum="0" Maximum="3600" Value="0"
+                    VerticalAlignment="Center" Height="24"
+                    IsMoveToPointEnabled="True"
+                    PreviewMouseLeftButtonUp="SeekSlider_Committed"
+                    LostMouseCapture="SeekSlider_LostCapture"/>
+            <TextBlock x:Name="TotalTimeText" Grid.Column="2"
+                       Style="{StaticResource ChromeCaption}"
+                       Text="--:--" Margin="12,0,0,0"/>
+          </Grid>
+
+          <DockPanel Grid.Row="2" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
+              <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
+                      Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
+              <Button x:Name="PrevButton" Style="{StaticResource TransportButton}"
+                      Content="⏮" ToolTip="Previous (stop at ends)"
+                      Click="Prev_Click" IsEnabled="False"/>
+              <Button x:Name="PlayButton" Style="{StaticResource TransportButton}"
+                      Content="▶" ToolTip="Play" Click="Play_Click"/>
+              <Button x:Name="PauseButton" Style="{StaticResource TransportButton}"
+                      Content="⏸" ToolTip="Pause" Click="Pause_Click"/>
+              <Button x:Name="StopButton" Style="{StaticResource TransportButton}"
+                      Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
+              <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
+                      Content="⏭" ToolTip="Next (stop at ends)"
+                      Click="Next_Click" IsEnabled="False" Margin="0,0,16,0"/>
+            </StackPanel>
+
+            <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
+                        DockPanel.Dock="Left" Margin="0,0,16,0"
+                        PreviewMouseWheel="VolumeGroup_PreviewMouseWheel">
+              <Button x:Name="MuteButton" Style="{StaticResource TransportButton}"
+                      Content="🔊" ToolTip="Mute" Click="Mute_Click"/>
+              <Slider x:Name="VolumeSlider"
+                      Width="96" MinWidth="88" MaxWidth="104"
+                      Minimum="0" Maximum="100" Value="80"
+                      VerticalAlignment="Center"
+                      TickFrequency="1" IsSnapToTickEnabled="True"
+                      ValueChanged="VolumeSlider_ValueChanged"
+                      ToolTip="Volume"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right">
+              <Button x:Name="SubButton" Style="{StaticResource TransportButton}"
+                      Content="CC" ToolTip="Subtitles" Click="Sub_Click"/>
+              <Button x:Name="AudioButton" Style="{StaticResource TransportButton}"
+                      Content="♪" ToolTip="Audio" Click="Audio_Click"/>
+              <Button x:Name="PlaylistButton" Style="{StaticResource TransportButton}"
+                      Content="≡" ToolTip="Playlist" Click="Playlist_Click"/>
+              <Button x:Name="FullscreenButton" Style="{StaticResource TransportButton}"
+                      Content="⛶" ToolTip="Fullscreen" Margin="0" Click="Fullscreen_Click"/>
+            </StackPanel>
+          </DockPanel>
         </Grid>
+      </Border>
 
-        <!-- Transport / volume / utility row -->
-        <DockPanel Grid.Row="2" LastChildFill="False">
-          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
-            <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
-                    Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
-            <Button x:Name="PrevButton" Style="{StaticResource TransportButton}"
-                    Content="⏮" ToolTip="Previous (stop at ends)"
-                    Click="Prev_Click" IsEnabled="False"/>
-            <Button x:Name="PlayButton" Style="{StaticResource TransportButton}"
-                    Content="▶" ToolTip="Play" Click="Play_Click"/>
-            <Button x:Name="PauseButton" Style="{StaticResource TransportButton}"
-                    Content="⏸" ToolTip="Pause" Click="Pause_Click"/>
-            <Button x:Name="StopButton" Style="{StaticResource TransportButton}"
-                    Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
-            <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
-                    Content="⏭" ToolTip="Next (stop at ends)"
-                    Click="Next_Click" IsEnabled="False" Margin="0,0,16,0"/>
-          </StackPanel>
-
-          <!-- S4: mute 40×40 + compact volume 88–104 (UX-001 AC-UI-3) -->
-          <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
-                      DockPanel.Dock="Left" Margin="0,0,16,0"
-                      PreviewMouseWheel="VolumeGroup_PreviewMouseWheel">
-            <Button x:Name="MuteButton" Style="{StaticResource TransportButton}"
-                    Content="🔊" ToolTip="Mute"
-                    Click="Mute_Click"/>
-            <Slider x:Name="VolumeSlider"
-                    Width="96" MinWidth="88" MaxWidth="104"
-                    Minimum="0" Maximum="100" Value="80"
-                    VerticalAlignment="Center"
-                    TickFrequency="1" IsSnapToTickEnabled="True"
-                    ValueChanged="VolumeSlider_ValueChanged"
-                    ToolTip="Volume"/>
-          </StackPanel>
-
-          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right">
-            <Button Style="{StaticResource TransportButton}" Content="CC" ToolTip="Subtitles (S5)" IsEnabled="False"/>
-            <Button Style="{StaticResource TransportButton}" Content="♪" ToolTip="Audio (S5)" IsEnabled="False"/>
-            <Button Style="{StaticResource TransportButton}" Content="≡" ToolTip="Playlist (S5)" IsEnabled="False"/>
-            <Button Style="{StaticResource TransportButton}" Content="⛶" ToolTip="Fullscreen (S5)"
-                    Margin="0" IsEnabled="False"/>
-          </StackPanel>
+      <!-- Track flyout (immediate, non-modal) -->
+      <Border x:Name="TrackFlyout" Style="{StaticResource SidePanel}"
+              HorizontalAlignment="Right" VerticalAlignment="Bottom"
+              Margin="0,0,16,108" Width="280" MaxHeight="280"
+              Visibility="Collapsed">
+        <DockPanel>
+          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock x:Name="TrackFlyoutTitle" Text="Tracks" FontWeight="SemiBold"/>
+            <Button Content="✕" Width="28" Height="28" HorizontalAlignment="Right"
+                    Click="CloseTrackFlyout_Click" Background="Transparent" BorderThickness="0" Foreground="#CCC"/>
+          </DockPanel>
+          <Button x:Name="LoadSubButton" DockPanel.Dock="Bottom" Content="Load external subtitle…"
+                  Margin="0,8,0,0" Click="LoadExternalSub_Click" Visibility="Collapsed"/>
+          <ListBox x:Name="TrackList"
+                   Background="Transparent" BorderThickness="0" Foreground="#F0F0F0"
+                   SelectionChanged="TrackList_SelectionChanged"/>
         </DockPanel>
-      </Grid>
-    </Border>
+      </Border>
 
-    <!-- Status / error overlay (top), not a second chrome L1 for video -->
-    <StackPanel VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
-      <TextBlock x:Name="StatusText" Text="Ready" Foreground="#A0FFFFFF" TextWrapping="Wrap"/>
-      <TextBlock x:Name="ErrorText" Foreground="#FF6B6B" Margin="0,6,0,0"
-                 TextWrapping="Wrap" Visibility="Collapsed"/>
-    </StackPanel>
+      <StackPanel VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
+        <TextBlock x:Name="StatusText" Text="Ready" Foreground="#A0FFFFFF" TextWrapping="Wrap"/>
+        <TextBlock x:Name="ErrorText" Foreground="#FF6B6B" Margin="0,6,0,0"
+                   TextWrapping="Wrap" Visibility="Collapsed"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Playlist L2 280–320 -->
+    <Border x:Name="PlaylistPanel" Grid.Column="1" Style="{StaticResource SidePanel}"
+            MinWidth="280" MaxWidth="320" Visibility="Collapsed">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Playlist" FontWeight="SemiBold" Margin="0,0,0,8"/>
+        <TextBlock x:Name="PlaylistEmpty" DockPanel.Dock="Top"
+                   Text="No items — Open a file to start."
+                   Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Visibility="Visible"/>
+        <Button DockPanel.Dock="Bottom" Content="Open…" Margin="0,8,0,0" Click="Open_Click"/>
+        <ListBox x:Name="PlaylistList"
+                 Background="Transparent" BorderThickness="0" Foreground="#F0F0F0"
+                 MouseDoubleClick="PlaylistList_MouseDoubleClick"/>
+      </DockPanel>
+    </Border>
   </Grid>
 </Window>
