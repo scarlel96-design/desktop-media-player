@@ -479,6 +479,23 @@ public partial class MainWindow : Window, IPlaybackObserver
                 Theme_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.OemPeriod:
+            case Key.Decimal:
+                _facade.FrameStep(1);
+                e.Handled = true;
+                break;
+            case Key.OemComma:
+                _facade.FrameStep(-1);
+                e.Handled = true;
+                break;
+            case Key.F12:
+                Screenshot_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.I when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                Info_Click(sender, e);
+                e.Handled = true;
+                break;
         }
 
         ArmAutoHide();
@@ -744,6 +761,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private bool ShouldPauseAutoHide() =>
         TrackFlyout.Visibility == Visibility.Visible
         || PlaylistPanel.Visibility == Visibility.Visible
+        || MediaInfoFlyout.Visibility == Visibility.Visible
         || ErrorText.Visibility == Visibility.Visible;
 
     private void ArmAutoHide()

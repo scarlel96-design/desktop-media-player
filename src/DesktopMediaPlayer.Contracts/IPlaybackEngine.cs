@@ -23,4 +23,5 @@ public interface IPlaybackEngine : IDisposable
     void LoadExternalSubtitle(string path);
     void SetSubtitleOffset(double seconds);
     void Screenshot(string path);
+    MediaInfoBasics GetMediaInfo();
 }

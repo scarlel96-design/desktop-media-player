@@ -98,7 +98,11 @@
                       Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
               <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
                       Content="⏭" ToolTip="Next (stop at ends)"
-                      Click="Next_Click" IsEnabled="False" Margin="0,0,16,0"/>
+                      Click="Next_Click" IsEnabled="False"/>
+              <Button x:Name="FrameBackButton" Style="{StaticResource TransportButton}"
+                      Content="⏮|" ToolTip="Frame back" Click="FrameBack_Click"/>
+              <Button x:Name="FrameStepButton" Style="{StaticResource TransportButton}"
+                      Content="|⏭" ToolTip="Frame step" Click="FrameStep_Click" Margin="0,0,16,0"/>
             </StackPanel>
 
             <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
@@ -122,6 +126,10 @@
                       Content="♪" ToolTip="Audio" Click="Audio_Click"/>
               <Button x:Name="PlaylistButton" Style="{StaticResource TransportButton}"
                       Content="≡" ToolTip="Playlist" Click="Playlist_Click"/>
+              <Button x:Name="ScreenshotButton" Style="{StaticResource TransportButton}"
+                      Content="🖼" ToolTip="Screenshot" Click="Screenshot_Click"/>
+              <Button x:Name="InfoButton" Style="{StaticResource TransportButton}"
+                      Content="ℹ" ToolTip="Media info" Click="Info_Click"/>
               <Button x:Name="ThemeButton" Style="{StaticResource TransportButton}"
                       Content="◐" ToolTip="Theme: Dark/Light/System" Click="Theme_Click"/>
               <Button x:Name="FullscreenButton" Style="{StaticResource TransportButton}"
@@ -147,6 +155,22 @@
           <ListBox x:Name="TrackList"
                    Background="Transparent" BorderThickness="0" Foreground="#F0F0F0"
                    SelectionChanged="TrackList_SelectionChanged"/>
+        </DockPanel>
+      </Border>
+
+      <Border x:Name="MediaInfoFlyout" Style="{StaticResource SidePanel}"
+              HorizontalAlignment="Left" VerticalAlignment="Bottom"
+              Margin="16,0,0,108" Width="320" MaxHeight="320"
+              Visibility="Collapsed">
+        <DockPanel>
+          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="Media Info" FontWeight="SemiBold"/>
+            <Button Content="✕" Width="28" Height="28" HorizontalAlignment="Right"
+                    Click="CloseInfo_Click" Background="Transparent" BorderThickness="0" Foreground="#CCC"/>
+          </DockPanel>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="MediaInfoText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+          </ScrollViewer>
         </DockPanel>
       </Border>
 

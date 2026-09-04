@@ -106,6 +106,9 @@ internal sealed class FakePlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Calls.Add($"Screenshot:{path}");
     }
 
+    public MediaInfoBasics GetMediaInfo() =>
+        new(LastOpenedPath, "fake", "mp4", "h264", "aac", 1920, 1080, _duration);
+
     public bool TryProbe(out string? detail)
     {
         detail = ProbeDetail;

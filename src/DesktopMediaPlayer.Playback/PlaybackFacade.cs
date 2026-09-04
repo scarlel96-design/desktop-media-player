@@ -203,6 +203,12 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INative
         _inner.Screenshot(path);
     }
 
+    public MediaInfoBasics GetMediaInfo()
+    {
+        ThrowIfDisposed();
+        return _inner.GetMediaInfo();
+    }
+
     public void OnFirstFrame() => FanOut(o => o.OnFirstFrame());
 
     public void OnStateChanged(PlaybackState state) => FanOut(o => o.OnStateChanged(state));

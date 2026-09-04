@@ -362,6 +362,31 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Check(MpvNative.mpv_command_string(_mpv, $"screenshot-to-file \"{escaped}\""), "screenshot-to-file");
     });
 
+
+    public MediaInfoBasics GetMediaInfo()
+    {
+        if (_mpv == nint.Zero)
+        {
+            return new MediaInfoBasics(null, null, null, null, null, null, null, 0);
+        }
+
+        static int? ParseInt(string? s) =>
+            int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : null;
+
+        static double ParseDouble(string? s) =>
+            double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
+
+        var path = MpvNative.GetPropertyAndFree(_mpv, "path");
+        var title = MpvNative.GetPropertyAndFree(_mpv, "media-title");
+        var format = MpvNative.GetPropertyAndFree(_mpv, "file-format");
+        var vcodec = MpvNative.GetPropertyAndFree(_mpv, "video-codec");
+        var acodec = MpvNative.GetPropertyAndFree(_mpv, "audio-codec");
+        var w = ParseInt(MpvNative.GetPropertyAndFree(_mpv, "width"));
+        var h = ParseInt(MpvNative.GetPropertyAndFree(_mpv, "height"));
+        var dur = ParseDouble(MpvNative.GetPropertyAndFree(_mpv, "duration"));
+        return new MediaInfoBasics(path, title, format, vcodec, acodec, w, h, dur);
+    }
+
     public void Dispose()
     {
         if (_disposed)
