@@ -923,17 +923,12 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         var info = _facade.GetMediaInfo();
         MediaInfoText.Text =
-            $"Path: {info.Path ?? "-"}
-" +
-            $"Title: {info.Title ?? "-"}
-" +
-            $"Format: {info.Format ?? "-"}
-" +
-            $"Video: {info.VideoCodec ?? "-"} {info.Width}x{info.Height}
-" +
-            $"Audio: {info.AudioCodec ?? "-"}
-" +
-            $"Duration: {FormatTime(info.DurationSeconds, info.DurationSeconds > 0)}";
+            "Path: " + (info.Path ?? "-") + "\n" +
+            "Title: " + (info.Title ?? "-") + "\n" +
+            "Format: " + (info.Format ?? "-") + "\n" +
+            "Video: " + (info.VideoCodec ?? "-") + " " + info.Width + "x" + info.Height + "\n" +
+            "Audio: " + (info.AudioCodec ?? "-") + "\n" +
+            "Duration: " + FormatTime(info.DurationSeconds, info.DurationSeconds > 0);
         MediaInfoFlyout.Visibility = Visibility.Visible;
         ShowChrome();
         _autoHideTimer.Stop();
