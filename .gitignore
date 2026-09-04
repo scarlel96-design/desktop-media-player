@@ -1,0 +1,63 @@
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.rsuser
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# IDE
+.idea/
+*.swp
+*~
+.vscode/*
+!.vscode/extensions.json
+
+# Test / coverage
+TestResults/
+[Aa][Cc]overage/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+
+# Native binaries (keep README)
+native/**/*.dll
+native/**/*.DLL
+native/**/*.so
+native/**/*.dylib
+!native/win-x64/README.md
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local spike logs / secrets
+*.log
+.env
+*.local.json

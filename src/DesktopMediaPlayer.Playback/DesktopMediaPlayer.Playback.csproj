@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DesktopMediaPlayer.Playback</RootNamespace>
+    <AssemblyName>DesktopMediaPlayer.Playback</AssemblyName>
+    <Description>Playback facade: UI talks only to IPlaybackEngine.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
+  </ItemGroup>
+</Project>

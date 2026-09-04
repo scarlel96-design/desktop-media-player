@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DesktopMediaPlayer.Engine.Mpv</RootNamespace>
+    <AssemblyName>DesktopMediaPlayer.Engine.Mpv</AssemblyName>
+    <Description>libmpv engine host. The only project that P/Invokes libmpv.</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
+    <ProjectReference Include="..\DesktopMediaPlayer.Platform\DesktopMediaPlayer.Platform.csproj" />
+  </ItemGroup>
+</Project>

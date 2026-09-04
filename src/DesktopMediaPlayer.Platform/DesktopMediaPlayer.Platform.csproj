@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DesktopMediaPlayer.Platform</RootNamespace>
+    <AssemblyName>DesktopMediaPlayer.Platform</AssemblyName>
+    <Description>Logging and hardware-accel policy for the Step 0 spike.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
+  </ItemGroup>
+</Project>

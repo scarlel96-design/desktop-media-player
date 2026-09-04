@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DesktopMediaPlayer.Contracts</RootNamespace>
+    <AssemblyName>DesktopMediaPlayer.Contracts</AssemblyName>
+    <Description>Frozen playback contracts for the desktop media player spike.</Description>
+  </PropertyGroup>
+</Project>

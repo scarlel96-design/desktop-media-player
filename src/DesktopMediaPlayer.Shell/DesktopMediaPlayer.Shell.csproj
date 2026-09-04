@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>DesktopMediaPlayer.Shell</RootNamespace>
+    <AssemblyName>DesktopMediaPlayer.Shell</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>x64</PlatformTarget>
+    <Description>WPF shell hosting VideoHwndHost and PlaybackFacade.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
+    <ProjectReference Include="..\DesktopMediaPlayer.Platform\DesktopMediaPlayer.Platform.csproj" />
+    <ProjectReference Include="..\DesktopMediaPlayer.Playback\DesktopMediaPlayer.Playback.csproj" />
+    <ProjectReference Include="..\DesktopMediaPlayer.Engine.Mpv\DesktopMediaPlayer.Engine.Mpv.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\native\win-x64\libmpv-2.dll')">
+    <None Include="..\..\native\win-x64\*" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>
