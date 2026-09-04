@@ -8,6 +8,7 @@ internal sealed class RecordingObserver : IPlaybackObserver
     public List<PlaybackState> States { get; } = new();
     public List<(string Code, string Message, bool Recoverable)> Errors { get; } = new();
     public List<(bool Active, string Reason)> HwAccel { get; } = new();
+    public List<(double Position, double Duration)> Positions { get; } = new();
 
     public void OnFirstFrame() => FirstFrameCount++;
     public void OnStateChanged(PlaybackState state) => States.Add(state);
@@ -15,4 +16,6 @@ internal sealed class RecordingObserver : IPlaybackObserver
         Errors.Add((code, message, recoverable));
     public void OnHardwareAccelChanged(bool active, string reason) =>
         HwAccel.Add((active, reason));
+    public void OnPositionChanged(double positionSeconds, double durationSeconds) =>
+        Positions.Add((positionSeconds, durationSeconds));
 }

@@ -10,7 +10,7 @@ namespace DesktopMediaPlayer.Engine.Mpv;
 /// <summary>
 /// libmpv engine host. UI thread posts commands; a dedicated engine thread owns the mpv handle.
 /// </summary>
-public sealed class MpvPlaybackEngine : IPlaybackEngine
+public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 {
     private readonly SpikeLogger _logger;
     private readonly ConcurrentQueue<Action> _queue = new();
@@ -43,15 +43,15 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
     public IRenderHost RenderHost { get; }
 
     /// <summary>True if libmpv-2.dll can be resolved (does not require initialize).</summary>
-    public static bool ProbeNativeLibrary(out string? pathOrError)
+    public bool TryProbe(out string? detail)
     {
         if (MpvNative.TryProbeLibrary(out var loaded, out var err))
         {
-            pathOrError = loaded;
+            detail = loaded;
             return true;
         }
 
-        pathOrError = err;
+        detail = err;
         return false;
     }
 
@@ -198,6 +198,128 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
             NativeMethods.SetWindowPos(_wid, nint.Zero, 0, 0, width, height, swpNoZOrder | swpNoMove | swpNoActivate);
         });
     }
+
+
+    public void FrameStep(int steps) => Post(() =>
+    {
+        if (_mpv == nint.Zero || steps == 0)
+        {
+            return;
+        }
+
+        // Positive = forward, negative = backward (mpv frame-back-step / frame-step).
+        for (var i = 0; i < Math.Abs(steps); i++)
+        {
+            var cmd = steps > 0 ? "frame-step" : "frame-back-step";
+            Check(MpvNative.mpv_command_string(_mpv, cmd), cmd);
+        }
+    });
+
+    public void SetMute(bool mute) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        Check(MpvNative.mpv_set_property_string(_mpv, "mute", mute ? "yes" : "no"), "mute");
+    });
+
+    public bool GetMute()
+    {
+        if (_mpv == nint.Zero)
+        {
+            return false;
+        }
+
+        // Best-effort sync read; may be slightly stale vs engine thread.
+        var v = MpvNative.GetPropertyAndFree(_mpv, "mute");
+        return string.Equals(v, "yes", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public double GetPosition()
+    {
+        if (_mpv == nint.Zero)
+        {
+            return 0;
+        }
+
+        var v = MpvNative.GetPropertyAndFree(_mpv, "time-pos");
+        return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
+    }
+
+    public double GetDuration()
+    {
+        if (_mpv == nint.Zero)
+        {
+            return 0;
+        }
+
+        var v = MpvNative.GetPropertyAndFree(_mpv, "duration");
+        return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
+    }
+
+    public IReadOnlyList<MediaTrackInfo> ListTracks()
+    {
+        // Skeleton: full track enumeration lands with S5 subtitle/audio UI.
+        return Array.Empty<MediaTrackInfo>();
+    }
+
+    public void SelectTrack(MediaTrackKind kind, int id) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var prop = kind switch
+        {
+            MediaTrackKind.Audio => "aid",
+            MediaTrackKind.Subtitle => "sid",
+            MediaTrackKind.Video => "vid",
+            _ => null
+        };
+        if (prop is null)
+        {
+            return;
+        }
+
+        Check(MpvNative.mpv_set_property_string(_mpv, prop, id.ToString(CultureInfo.InvariantCulture)), prop);
+    });
+
+    public void LoadExternalSubtitle(string path) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var escaped = path.Replace("", "/", StringComparison.Ordinal).Replace(""", """, StringComparison.Ordinal);
+        Check(MpvNative.mpv_command_string(_mpv, $"sub-add \"{escaped}\""), "sub-add");
+    });
+
+    public void SetSubtitleOffset(double seconds) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        Check(
+            MpvNative.mpv_set_property_string(_mpv, "sub-delay", seconds.ToString(CultureInfo.InvariantCulture)),
+            "sub-delay");
+    });
+
+    public void Screenshot(string path) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var escaped = path.Replace("", "/", StringComparison.Ordinal).Replace(""", """, StringComparison.Ordinal);
+        Check(MpvNative.mpv_command_string(_mpv, $"screenshot-to-file \"{escaped}\""), "screenshot-to-file");
+    });
 
     public void Dispose()
     {

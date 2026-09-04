@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
 using DesktopMediaPlayer.Contracts;
-using DesktopMediaPlayer.Engine.Mpv;
 using DesktopMediaPlayer.Playback;
 using Microsoft.Win32;
 
@@ -41,7 +40,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         TryAttachRenderHost();
         ResizeRenderHost();
 
-        if (!MpvPlaybackEngine.ProbeNativeLibrary(out var detail))
+        if (!_facade.TryProbe(out var detail))
         {
             ShowError(
                 "libmpv-2.dll not found. Place LGPL binaries under native/win-x64 or set DMP_LIBMPV_PATH. "
@@ -160,6 +159,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 ? $"HW accel active: {reason}"
                 : $"HW accel inactive: {reason}";
         });
+    }
+
+    public void OnPositionChanged(double positionSeconds, double durationSeconds)
+    {
+        // Wired in S2 timeline; keep no-op for S0 Shell.
     }
 
     protected override void OnClosed(EventArgs e)

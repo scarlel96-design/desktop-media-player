@@ -7,4 +7,7 @@ public interface IPlaybackObserver
     void OnStateChanged(PlaybackState state);
     void OnError(string code, string message, bool recoverable);
     void OnHardwareAccelChanged(bool active, string reason);
+
+    /// <summary>Position/duration update (seconds). Throttle at Facade ≤100ms when wired.</summary>
+    void OnPositionChanged(double positionSeconds, double durationSeconds);
 }

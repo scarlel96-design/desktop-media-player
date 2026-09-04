@@ -4,11 +4,12 @@ namespace DesktopMediaPlayer.Playback;
 
 /// <summary>
 /// Facade over an inner <see cref="IPlaybackEngine"/> with volume clamping,
-/// null/empty path validation, and thread-safe observer fan-out.
+/// path validation, observer fan-out, and native health probe (KI-010).
 /// </summary>
-public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
+public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INativeRuntimeProbe
 {
     private readonly IPlaybackEngine _inner;
+    private INativeRuntimeProbe? _probe;
     private readonly object _observersGate = new();
     private readonly List<IPlaybackObserver> _observers = new();
     private bool _disposed;
@@ -16,6 +17,7 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
     public PlaybackFacade(IPlaybackEngine inner, params IPlaybackObserver[] observers)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+        _probe = inner as INativeRuntimeProbe;
         if (observers is { Length: > 0 })
         {
             foreach (var o in observers)
@@ -28,8 +30,15 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
         }
     }
 
-    /// <summary>Optional render host exposed by the inner engine (e.g. MpvPlaybackEngine.RenderHost).</summary>
+    /// <summary>Optional render host exposed by the inner engine.</summary>
     public IRenderHost? RenderHost { get; set; }
+
+    /// <summary>Override native probe (KI-010). Defaults to inner if it implements <see cref="INativeRuntimeProbe"/>.</summary>
+    public INativeRuntimeProbe? NativeProbe
+    {
+        get => _probe;
+        set => _probe = value;
+    }
 
     public void AddObserver(IPlaybackObserver observer)
     {
@@ -54,6 +63,18 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
         {
             _observers.Remove(observer);
         }
+    }
+
+    public bool TryProbe(out string? detail)
+    {
+        ThrowIfDisposed();
+        if (_probe is null)
+        {
+            detail = "No native runtime probe registered.";
+            return false;
+        }
+
+        return _probe.TryProbe(out detail);
     }
 
     public void Open(string path)
@@ -101,14 +122,85 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
     public void SetVolume(int volume)
     {
         ThrowIfDisposed();
-        var clamped = Math.Clamp(volume, 0, 100);
-        _inner.SetVolume(clamped);
+        _inner.SetVolume(Math.Clamp(volume, 0, 100));
     }
 
     public PlaybackState GetState()
     {
         ThrowIfDisposed();
         return _inner.GetState();
+    }
+
+    public void FrameStep(int steps)
+    {
+        ThrowIfDisposed();
+        _inner.FrameStep(steps);
+    }
+
+    public void SetMute(bool mute)
+    {
+        ThrowIfDisposed();
+        _inner.SetMute(mute);
+    }
+
+    public bool GetMute()
+    {
+        ThrowIfDisposed();
+        return _inner.GetMute();
+    }
+
+    public double GetPosition()
+    {
+        ThrowIfDisposed();
+        return _inner.GetPosition();
+    }
+
+    public double GetDuration()
+    {
+        ThrowIfDisposed();
+        return _inner.GetDuration();
+    }
+
+    public IReadOnlyList<MediaTrackInfo> ListTracks()
+    {
+        ThrowIfDisposed();
+        return _inner.ListTracks();
+    }
+
+    public void SelectTrack(MediaTrackKind kind, int id)
+    {
+        ThrowIfDisposed();
+        _inner.SelectTrack(kind, id);
+    }
+
+    public void LoadExternalSubtitle(string path)
+    {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            OnError("invalid_path", "Subtitle path is null or empty.", recoverable: true);
+            return;
+        }
+
+        _inner.LoadExternalSubtitle(path);
+    }
+
+    public void SetSubtitleOffset(double seconds)
+    {
+        ThrowIfDisposed();
+        _inner.SetSubtitleOffset(seconds);
+    }
+
+    public void Screenshot(string path)
+    {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            OnError("invalid_path", "Screenshot path is null or empty.", recoverable: true);
+            return;
+        }
+
+        _inner.Screenshot(path);
     }
 
     public void OnFirstFrame() => FanOut(o => o.OnFirstFrame());
@@ -120,6 +212,9 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
 
     public void OnHardwareAccelChanged(bool active, string reason) =>
         FanOut(o => o.OnHardwareAccelChanged(active, reason));
+
+    public void OnPositionChanged(double positionSeconds, double durationSeconds) =>
+        FanOut(o => o.OnPositionChanged(positionSeconds, durationSeconds));
 
     private void FanOut(Action<IPlaybackObserver> action)
     {
@@ -142,10 +237,7 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver
         }
     }
 
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-    }
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     public void Dispose()
     {

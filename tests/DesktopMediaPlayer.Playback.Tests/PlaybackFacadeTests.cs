@@ -89,4 +89,59 @@ public sealed class PlaybackFacadeTests
 
         Assert.Equal(new[] { PlaybackState.Paused }, observer.States);
     }
+
+    [Fact]
+    public void TryProbe_DelegatesToInnerHealthCheck()
+    {
+        var fake = new FakePlaybackEngine { ProbeResult = true, ProbeDetail = "lib-ok" };
+        using var facade = new PlaybackFacade(fake);
+
+        var ok = facade.TryProbe(out var detail);
+
+        Assert.True(ok);
+        Assert.Equal("lib-ok", detail);
+    }
+
+    [Fact]
+    public void SetMute_And_FrameStep_DelegateToInner()
+    {
+        var fake = new FakePlaybackEngine();
+        using var facade = new PlaybackFacade(fake);
+
+        facade.SetMute(true);
+        facade.FrameStep(1);
+
+        Assert.True(facade.GetMute());
+        Assert.Contains("SetMute:True", fake.Calls);
+        Assert.Contains("FrameStep:1", fake.Calls);
+    }
+
+    [Fact]
+    public void LoadExternalSubtitle_EmptyPath_ReportsError()
+    {
+        var fake = new FakePlaybackEngine();
+        var observer = new RecordingObserver();
+        using var facade = new PlaybackFacade(fake, observer);
+
+        facade.LoadExternalSubtitle("  ");
+
+        Assert.DoesNotContain(fake.Calls, c => c.StartsWith("LoadExternalSubtitle:", StringComparison.Ordinal));
+        Assert.Single(observer.Errors);
+        Assert.Equal("invalid_path", observer.Errors[0].Code);
+    }
+
+    [Fact]
+    public void MinimalPlaylist_PlayAt_OpensViaEngine()
+    {
+        var fake = new FakePlaybackEngine();
+        using var facade = new PlaybackFacade(fake);
+        var playlist = new MinimalPlaylistService(facade);
+        playlist.Add("C:/media/a.mp4");
+        playlist.Add("C:/media/b.mp4");
+
+        playlist.PlayAt(1);
+
+        Assert.Equal(1, playlist.CurrentIndex);
+        Assert.Equal("C:/media/b.mp4", fake.LastOpenedPath);
+    }
 }

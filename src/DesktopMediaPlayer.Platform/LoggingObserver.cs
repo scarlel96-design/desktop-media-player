@@ -30,4 +30,7 @@ public sealed class LoggingObserver : IPlaybackObserver
             _logger.HwdecFallback(reason);
         }
     }
+
+    public void OnPositionChanged(double positionSeconds, double durationSeconds) =>
+        _logger.Log("info", "position", $"pos={positionSeconds:F3} dur={durationSeconds:F3}");
 }

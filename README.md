@@ -2,7 +2,7 @@
 
 WPF + libmpv playback spike for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
 
-**Status: IMPLEMENTED source tree / WINDOWS VALIDATION PENDING — not PASS.**
+**Status: Step 0 PASS WITH KI · Phase A in progress (S0 Contracts/Facade).**
 
 ## Layers
 

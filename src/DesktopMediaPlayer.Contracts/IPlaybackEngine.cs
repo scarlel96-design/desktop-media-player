@@ -11,4 +11,16 @@ public interface IPlaybackEngine : IDisposable
     void Seek(double seconds);
     void SetVolume(int volume); // 0-100
     PlaybackState GetState();
+
+    // Phase A extensions (Architecture S0 — approved)
+    void FrameStep(int steps);
+    void SetMute(bool mute);
+    bool GetMute();
+    double GetPosition();
+    double GetDuration();
+    IReadOnlyList<MediaTrackInfo> ListTracks();
+    void SelectTrack(MediaTrackKind kind, int id);
+    void LoadExternalSubtitle(string path);
+    void SetSubtitleOffset(double seconds);
+    void Screenshot(string path);
 }
