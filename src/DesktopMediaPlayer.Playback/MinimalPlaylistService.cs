@@ -2,7 +2,7 @@ using DesktopMediaPlayer.Contracts;
 
 namespace DesktopMediaPlayer.Playback;
 
-/// <summary>Phase A minimal playlist — Open only through <see cref="IPlaybackEngine"/>.</summary>
+/// <summary>Phase A minimal playlist — Open only through <see cref="IPlaybackEngine"/>. Ends stop (no wrap).</summary>
 public sealed class MinimalPlaylistService : IPlaylistService
 {
     private readonly IPlaybackEngine _engine;
@@ -32,6 +32,28 @@ public sealed class MinimalPlaylistService : IPlaylistService
             lock (_items)
             {
                 return _currentIndex;
+            }
+        }
+    }
+
+    public bool CanPlayPrevious
+    {
+        get
+        {
+            lock (_items)
+            {
+                return _currentIndex > 0;
+            }
+        }
+    }
+
+    public bool CanPlayNext
+    {
+        get
+        {
+            lock (_items)
+            {
+                return _currentIndex >= 0 && _currentIndex < _items.Count - 1;
             }
         }
     }
@@ -81,12 +103,15 @@ public sealed class MinimalPlaylistService : IPlaylistService
         {
             if (_items.Count == 0)
             {
+                _engine.Stop();
                 return;
             }
 
             var next = _currentIndex + 1;
             if (next >= _items.Count)
             {
+                // Queue end: stop (no wrap).
+                _engine.Stop();
                 return;
             }
 
@@ -99,13 +124,14 @@ public sealed class MinimalPlaylistService : IPlaylistService
     {
         lock (_items)
         {
-            if (_items.Count == 0)
+            if (_items.Count == 0 || _currentIndex <= 0)
             {
+                // Queue start: stop (no wrap).
+                _engine.Stop();
                 return;
             }
 
-            var prev = _currentIndex <= 0 ? 0 : _currentIndex - 1;
-            _currentIndex = prev;
+            _currentIndex -= 1;
             _engine.Open(_items[_currentIndex]);
         }
     }

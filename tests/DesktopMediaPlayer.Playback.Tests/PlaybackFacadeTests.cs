@@ -144,4 +144,36 @@ public sealed class PlaybackFacadeTests
         Assert.Equal(1, playlist.CurrentIndex);
         Assert.Equal("C:/media/b.mp4", fake.LastOpenedPath);
     }
+
+    [Fact]
+    public void PlayNext_AtEnd_StopsWithoutWrap()
+    {
+        var fake = new FakePlaybackEngine();
+        using var facade = new PlaybackFacade(fake);
+        var playlist = new MinimalPlaylistService(facade);
+        playlist.Add("C:/a.mp4");
+        playlist.Add("C:/b.mp4");
+        playlist.PlayAt(1);
+
+        playlist.PlayNext();
+
+        Assert.False(playlist.CanPlayNext);
+        Assert.Contains("Stop", fake.Calls);
+        Assert.Equal("C:/b.mp4", fake.LastOpenedPath);
+    }
+
+    [Fact]
+    public void PlayPrevious_AtStart_StopsWithoutWrap()
+    {
+        var fake = new FakePlaybackEngine();
+        using var facade = new PlaybackFacade(fake);
+        var playlist = new MinimalPlaylistService(facade);
+        playlist.Add("C:/a.mp4");
+        playlist.PlayAt(0);
+
+        playlist.PlayPrevious();
+
+        Assert.False(playlist.CanPlayPrevious);
+        Assert.Contains("Stop", fake.Calls);
+    }
 }

@@ -15,6 +15,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 {
     private readonly DispatcherTimer _positionTimer;
     private PlaybackFacade? _facade;
+    private IPlaylistService? _playlist;
     private bool _renderAttached;
     private bool _seekDragging;
     private double _durationSeconds;
@@ -39,6 +40,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         var app = (App)Application.Current;
         _facade = app.Facade;
+        _playlist = app.Playlist;
         if (_facade is null)
         {
             ShowError("Playback facade was not composed.");
@@ -46,6 +48,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         _facade.AddObserver(this);
+        RefreshTransportEnabled();
         VolumeSlider.Value = 80;
         _facade.SetVolume(80);
 
@@ -111,7 +114,17 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             ErrorText.Visibility = Visibility.Collapsed;
             TryAttachRenderHost();
-            _facade?.Open(dlg.FileName);
+            if (_playlist is not null)
+            {
+                _playlist.Add(dlg.FileName);
+                _playlist.PlayAt(_playlist.Items.Count - 1);
+            }
+            else
+            {
+                _facade?.Open(dlg.FileName);
+            }
+
+            RefreshTransportEnabled();
             _positionTimer.Start();
         }
     }
@@ -132,6 +145,35 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             SeekSlider.Value = 0;
         }
+
+        RefreshTransportEnabled();
+    }
+
+    private void Prev_Click(object sender, RoutedEventArgs e)
+    {
+        _playlist?.PlayPrevious();
+        RefreshTransportEnabled();
+        _positionTimer.Start();
+    }
+
+    private void Next_Click(object sender, RoutedEventArgs e)
+    {
+        _playlist?.PlayNext();
+        RefreshTransportEnabled();
+        _positionTimer.Start();
+    }
+
+    private void RefreshTransportEnabled()
+    {
+        if (_playlist is null)
+        {
+            PrevButton.IsEnabled = false;
+            NextButton.IsEnabled = false;
+            return;
+        }
+
+        PrevButton.IsEnabled = _playlist.CanPlayPrevious;
+        NextButton.IsEnabled = _playlist.CanPlayNext;
     }
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -249,6 +291,8 @@ public partial class MainWindow : Window, IPlaybackObserver
             {
                 _positionTimer.Start();
             }
+
+            RefreshTransportEnabled();
         });
     }
 

@@ -77,13 +77,17 @@
             <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
                     Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
             <Button x:Name="PrevButton" Style="{StaticResource TransportButton}"
-                    Content="⏮" ToolTip="Previous (stop at ends)" IsEnabled="False"/>
+                    Content="⏮" ToolTip="Previous (stop at ends)"
+                    Click="Prev_Click" IsEnabled="False"/>
             <Button x:Name="PlayButton" Style="{StaticResource TransportButton}"
                     Content="▶" ToolTip="Play" Click="Play_Click"/>
             <Button x:Name="PauseButton" Style="{StaticResource TransportButton}"
                     Content="⏸" ToolTip="Pause" Click="Pause_Click"/>
             <Button x:Name="StopButton" Style="{StaticResource TransportButton}"
-                    Content="⏹" ToolTip="Stop" Click="Stop_Click" Margin="0,0,16,0"/>
+                    Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
+            <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
+                    Content="⏭" ToolTip="Next (stop at ends)"
+                    Click="Next_Click" IsEnabled="False" Margin="0,0,16,0"/>
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
