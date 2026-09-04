@@ -51,7 +51,7 @@ UTF-8 log at `%LocalAppData%\desktop-media-player\spike.log` and Console.
 | `first_frame` | First VIDEO_RECONFIG or PLAYBACK_RESTART after Open |
 | `hwdec_active` | Hardware decode path active (`hwdec-current`) |
 | `hwdec_fallback` | Stepped D3D11VA → D3D11VA-copy → software |
-| `render_path` | `vo` / `gpu-context` / `hwdec-current` (after_init + first_frame) |
+| `render_path` | `vo` / `gpu-context` / `hwdec-current` / `frame-drop` / `decoder-drop` / `vo-drop` (after_init, first_frame, state transition, ~2s while Playing) |
 | `state` | PlaybackState transition |
 | `error` | Engine/UI error with code/message |
 

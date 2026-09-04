@@ -27,6 +27,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
     private bool _disposed;
     private string? _pendingOpen;
     private int _volume = 100;
+    private DateTime _lastMetricsUtc = DateTime.MinValue;
+    private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
 
     public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null)
     {
@@ -259,6 +261,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
                 }
 
                 PumpEvents();
+                MaybeLogPeriodicMetrics();
                 _wake.WaitOne(50);
             }
         }
@@ -455,20 +458,56 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
         ReportHwdec();
     }
 
-    /// <summary>Logs vo / gpu-context / hwdec-current for Windows spike evidence (PS-014).</summary>
-    private void LogRenderPath(string phase)
+    /// <summary>Logs vo / gpu-context / hwdec-current / frame drops for Windows spike evidence.</summary>
+    private void LogRenderPath(string phase) => LogPlaybackMetrics(phase);
+
+    private void MaybeLogPeriodicMetrics()
+    {
+        PlaybackState state;
+        lock (_stateGate)
+        {
+            state = _state;
+        }
+
+        if (state != PlaybackState.Playing || _mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (now - _lastMetricsUtc < MetricsInterval)
+        {
+            return;
+        }
+
+        LogPlaybackMetrics("periodic");
+    }
+
+    private void LogPlaybackMetrics(string phase)
     {
         if (_mpv == nint.Zero)
         {
             return;
         }
 
+        _lastMetricsUtc = DateTime.UtcNow;
+
         var vo = MpvNative.GetPropertyAndFree(_mpv, "current-vo")
                  ?? MpvNative.GetPropertyAndFree(_mpv, "vo")
                  ?? "(unknown)";
         var gpuContext = MpvNative.GetPropertyAndFree(_mpv, "gpu-context") ?? "(unknown)";
         var hwdec = MpvNative.GetPropertyAndFree(_mpv, "hwdec-current") ?? "(unknown)";
-        _logger.Log("info", "render_path", $"phase={phase} vo={vo} gpu-context={gpuContext} hwdec-current={hwdec}");
+        var frameDrop = MpvNative.GetPropertyAndFree(_mpv, "frame-drop-count")
+                        ?? MpvNative.GetPropertyAndFree(_mpv, "drop-frame-count")
+                        ?? "(n/a)";
+        var decoderDrop = MpvNative.GetPropertyAndFree(_mpv, "decoder-frame-drop-count") ?? "(n/a)";
+        var voDrop = MpvNative.GetPropertyAndFree(_mpv, "vo-delayed-frame-count") ?? "(n/a)";
+
+        _logger.Log(
+            "info",
+            "render_path",
+            $"phase={phase} vo={vo} gpu-context={gpuContext} hwdec-current={hwdec} "
+            + $"frame-drop={frameDrop} decoder-drop={decoderDrop} vo-drop={voDrop}");
     }
 
     private void ReportHwdec()
@@ -511,6 +550,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
 
         _logger.State(state.ToString());
         Raise(o => o.OnStateChanged(state));
+        if (_mpv != nint.Zero)
+        {
+            LogPlaybackMetrics($"state:{state}");
+        }
     }
 
     private void RaiseError(string code, string message, bool recoverable)
