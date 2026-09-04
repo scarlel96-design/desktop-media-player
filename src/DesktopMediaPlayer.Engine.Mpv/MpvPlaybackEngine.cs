@@ -330,6 +330,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
         MpvNative.mpv_observe_property(_mpv, 1, "pause", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 2, "hwdec-current", MpvFormat.String);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
+        LogRenderPath("after_init");
         return true;
     }
 
@@ -450,7 +451,24 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine
         _firstFrameRaised = true;
         _logger.FirstFrame();
         Raise(o => o.OnFirstFrame());
+        LogRenderPath("first_frame");
         ReportHwdec();
+    }
+
+    /// <summary>Logs vo / gpu-context / hwdec-current for Windows spike evidence (PS-014).</summary>
+    private void LogRenderPath(string phase)
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var vo = MpvNative.GetPropertyAndFree(_mpv, "current-vo")
+                 ?? MpvNative.GetPropertyAndFree(_mpv, "vo")
+                 ?? "(unknown)";
+        var gpuContext = MpvNative.GetPropertyAndFree(_mpv, "gpu-context") ?? "(unknown)";
+        var hwdec = MpvNative.GetPropertyAndFree(_mpv, "hwdec-current") ?? "(unknown)";
+        _logger.Log("info", "render_path", $"phase={phase} vo={vo} gpu-context={gpuContext} hwdec-current={hwdec}");
     }
 
     private void ReportHwdec()
