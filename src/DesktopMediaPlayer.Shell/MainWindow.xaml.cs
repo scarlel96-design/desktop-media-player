@@ -7,8 +7,8 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Spike UI: video HWND host + Open/Play/Pause/Stop + Seek + Volume.
-/// Calls <see cref="PlaybackFacade"/> only — never mpv P/Invoke.
+/// Phase A S1: UX-001 Control Bar skeleton over video host.
+/// Calls <see cref="PlaybackFacade"/> only — never mpv P/Invoke. Blur OFF.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
 {
