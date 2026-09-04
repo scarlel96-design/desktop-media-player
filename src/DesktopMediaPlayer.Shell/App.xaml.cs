@@ -6,13 +6,14 @@ using DesktopMediaPlayer.Platform;
 
 namespace DesktopMediaPlayer.Shell;
 
-/// <summary>Composes logger + engine + facade + minimal playlist (composition root).</summary>
+/// <summary>Composition root: logger, engine, facade, playlist, resume.</summary>
 public partial class App : Application
 {
     internal SpikeLogger? Logger { get; private set; }
     internal MpvPlaybackEngine? Engine { get; private set; }
     internal PlaybackFacade? Facade { get; private set; }
     internal IPlaylistService? Playlist { get; private set; }
+    internal IResumeStore? ResumeStore { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -35,6 +36,7 @@ public partial class App : Application
         Facade.RenderHost = Engine.RenderHost;
         Engine.Observer = Facade;
         Playlist = new MinimalPlaylistService(Facade);
+        ResumeStore = new FileResumeStore();
     }
 
     protected override void OnExit(ExitEventArgs e)

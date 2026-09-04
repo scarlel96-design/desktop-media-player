@@ -11,14 +11,16 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A S1–S5: UX-001 chrome, timeline, transport, volume, FS/Sub/Audio/Playlist.
-/// Facade-only. Blur OFF. Subtitles via engine tracks (no UI overlay path).
+/// Phase A Shell: UX-001 chrome through S6 (theme/hotkeys/resume/auto-hide).
+/// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
 {
     private readonly DispatcherTimer _positionTimer;
+    private readonly DispatcherTimer _autoHideTimer;
     private PlaybackFacade? _facade;
     private IPlaylistService? _playlist;
+    private IResumeStore? _resume;
     private bool _renderAttached;
     private bool _seekDragging;
     private double _durationSeconds;
@@ -28,6 +30,8 @@ public partial class MainWindow : Window, IPlaybackObserver
     private bool _suppressTrackSelection;
     private WindowState _windowStateBeforeFullscreen = WindowState.Normal;
     private WindowStyle _windowStyleBeforeFullscreen = WindowStyle.SingleBorderWindow;
+    private AppThemeMode _theme = AppThemeMode.Dark;
+    private string? _currentPath;
 
     public MainWindow()
     {
@@ -36,13 +40,24 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             Interval = TimeSpan.FromMilliseconds(100)
         };
-        _positionTimer.Tick += (_, _) => PollPosition();
+        _positionTimer.Tick += (_, _) =>
+        {
+            PollPosition();
+            SyncMuteFromEngine();
+        };
+
+        _autoHideTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(2.5)
+        };
+        _autoHideTimer.Tick += (_, _) => TryAutoHideChrome();
 
         Loaded += OnLoaded;
         SizeChanged += (_, _) => ResizeRenderHost();
         DpiChanged += (_, _) => ResizeRenderHost();
         SeekSlider.PreviewMouseLeftButtonDown += (_, _) => _seekDragging = true;
         SeekSlider.PreviewMouseLeftButtonUp += (_, _) => _seekDragging = false;
+        ApplyTheme(_theme);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -50,6 +65,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         var app = (App)Application.Current;
         _facade = app.Facade;
         _playlist = app.Playlist;
+        _resume = app.ResumeStore;
         if (_facade is null)
         {
             ShowError("Playback facade was not composed.");
@@ -63,10 +79,12 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.SetVolume(80);
         _facade.SetMute(false);
         RefreshMuteGlyph();
+        RefreshThemeButton();
 
         TryAttachRenderHost();
         ResizeRenderHost();
         UpdateTimeLabels(0, 0);
+        ShowChrome();
 
         if (!_facade.TryProbe(out var detail))
         {
@@ -122,35 +140,50 @@ public partial class MainWindow : Window, IPlaybackObserver
             Filter = "Media files|*.mp4;*.mkv;*.avi;*.mov;*.webm;*.ts;*.m4v;*.wmv|All files|*.*"
         };
 
-        if (dlg.ShowDialog(this) == true)
+        if (dlg.ShowDialog(this) != true)
         {
-            ErrorText.Visibility = Visibility.Collapsed;
-            TryAttachRenderHost();
-            if (_playlist is not null)
-            {
-                _playlist.Add(dlg.FileName);
-                _playlist.PlayAt(_playlist.Items.Count - 1);
-            }
-            else
-            {
-                _facade?.Open(dlg.FileName);
-            }
-
-            RefreshTransportEnabled();
-            _positionTimer.Start();
+            return;
         }
+
+        ErrorText.Visibility = Visibility.Collapsed;
+        TryAttachRenderHost();
+        PersistResume();
+        _currentPath = dlg.FileName;
+
+        if (_playlist is not null)
+        {
+            _playlist.Add(dlg.FileName);
+            _playlist.PlayAt(_playlist.Items.Count - 1);
+        }
+        else
+        {
+            _facade?.Open(dlg.FileName);
+        }
+
+        RefreshTransportEnabled();
+        RefreshPlaylistUi();
+        _positionTimer.Start();
+        ArmAutoHide();
     }
 
     private void Play_Click(object sender, RoutedEventArgs e)
     {
         _facade?.Play();
         _positionTimer.Start();
+        ArmAutoHide();
     }
 
-    private void Pause_Click(object sender, RoutedEventArgs e) => _facade?.Pause();
+    private void Pause_Click(object sender, RoutedEventArgs e)
+    {
+        _facade?.Pause();
+        PersistResume();
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
 
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
+        PersistResume();
         _facade?.Stop();
         UpdateTimeLabels(0, _durationSeconds);
         if (!_seekDragging)
@@ -159,20 +192,41 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         RefreshTransportEnabled();
+        ShowChrome();
+        _autoHideTimer.Stop();
     }
 
     private void Prev_Click(object sender, RoutedEventArgs e)
     {
+        PersistResume();
         _playlist?.PlayPrevious();
+        SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
+        RefreshPlaylistUi();
         _positionTimer.Start();
+        ArmAutoHide();
     }
 
     private void Next_Click(object sender, RoutedEventArgs e)
     {
+        PersistResume();
         _playlist?.PlayNext();
+        SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
+        RefreshPlaylistUi();
         _positionTimer.Start();
+        ArmAutoHide();
+    }
+
+    private void SyncCurrentPathFromPlaylist()
+    {
+        if (_playlist is null || _playlist.CurrentIndex < 0 || _playlist.CurrentIndex >= _playlist.Items.Count)
+        {
+            return;
+        }
+
+        _currentPath = _playlist.Items[_playlist.CurrentIndex];
+        TryRestoreResume(_currentPath);
     }
 
     private void RefreshTransportEnabled()
@@ -234,7 +288,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         RefreshMuteGlyph();
     }
 
-    private void VolumeGroup_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    private void VolumeGroup_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         var delta = e.Delta > 0 ? 5 : -5;
         VolumeSlider.Value = Math.Clamp(VolumeSlider.Value + delta, 0, 100);
@@ -248,13 +302,28 @@ public partial class MainWindow : Window, IPlaybackObserver
         MuteButton.ToolTip = muted ? "Unmute" : "Mute";
     }
 
-    private void SeekSlider_Committed(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void SyncMuteFromEngine()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var engineMute = _facade.GetMute();
+        if (engineMute != _muteUi)
+        {
+            _muteUi = engineMute;
+            RefreshMuteGlyph();
+        }
+    }
+
+    private void SeekSlider_Committed(object sender, MouseButtonEventArgs e)
     {
         _seekDragging = false;
         CommitSeek();
     }
 
-    private void SeekSlider_LostCapture(object sender, System.Windows.Input.MouseEventArgs e)
+    private void SeekSlider_LostCapture(object sender, MouseEventArgs e)
     {
         _seekDragging = false;
         CommitSeek();
@@ -262,13 +331,8 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void CommitSeek()
     {
-        if (_facade is null)
-        {
-            return;
-        }
-
-        // Slider Maximum tracks duration seconds when known.
-        _facade.Seek(SeekSlider.Value);
+        _facade?.Seek(SeekSlider.Value);
+        PersistResume();
     }
 
     private void PollPosition()
@@ -284,9 +348,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             return;
         }
 
-        var pos = _facade.GetPosition();
-        var dur = _facade.GetDuration();
-        ApplyTimeline(pos, dur);
+        ApplyTimeline(_facade.GetPosition(), _facade.GetDuration());
     }
 
     private void ApplyTimeline(double positionSeconds, double durationSeconds)
@@ -331,62 +393,14 @@ public partial class MainWindow : Window, IPlaybackObserver
         ErrorText.Text = message;
         ErrorText.Visibility = Visibility.Visible;
         StatusText.Text = "Error";
-    }
-
-    public void OnFirstFrame()
-    {
-        Dispatcher.Invoke(() =>
+        ShowChrome();
+        if (ErrorText.Style is null)
         {
-            StatusText.Text = "First frame";
-            ResizeRenderHost();
-            _positionTimer.Start();
-            PollPosition();
-            if (_flyoutKind is MediaTrackKind kind)
-            {
-                PopulateTrackList(kind);
-            }
-
-            RefreshPlaylistUi();
-        });
+            // ensure error remains visible in both themes
+        }
     }
 
-    public void OnStateChanged(PlaybackState state)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            StatusText.Text = $"State: {state}";
-            if (state is PlaybackState.Playing or PlaybackState.Opening or PlaybackState.Paused)
-            {
-                _positionTimer.Start();
-            }
-
-            RefreshTransportEnabled();
-            RefreshPlaylistUi();
-        });
-    }
-
-    public void OnError(string code, string message, bool recoverable)
-    {
-        Dispatcher.Invoke(() => ShowError($"[{code}] {message} (recoverable={recoverable})"));
-    }
-
-    public void OnHardwareAccelChanged(bool active, string reason)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            StatusText.Text = active
-                ? $"HW accel active: {reason}"
-                : $"HW accel inactive: {reason}";
-        });
-    }
-
-    public void OnPositionChanged(double positionSeconds, double durationSeconds)
-    {
-        Dispatcher.Invoke(() => ApplyTimeline(positionSeconds, durationSeconds));
-    }
-
-
-    // --- S5: FS / Sub / Audio / Playlist ---
+    // --- S5 panels ---
 
     private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
@@ -401,11 +415,73 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F11 || (e.Key == Key.Escape && WindowStyle == WindowStyle.None))
+        if (_facade is null)
         {
-            ToggleFullscreen();
-            e.Handled = true;
+            return;
         }
+
+        switch (e.Key)
+        {
+            case Key.Space:
+                if (_facade.GetState() == PlaybackState.Playing)
+                {
+                    Pause_Click(sender, e);
+                }
+                else
+                {
+                    Play_Click(sender, e);
+                }
+
+                e.Handled = true;
+                break;
+            case Key.Left:
+                _facade.Seek(Math.Max(0, _facade.GetPosition() - 5));
+                e.Handled = true;
+                break;
+            case Key.Right:
+                _facade.Seek(_facade.GetPosition() + 5);
+                e.Handled = true;
+                break;
+            case Key.Up:
+                VolumeSlider.Value = Math.Min(100, VolumeSlider.Value + 5);
+                e.Handled = true;
+                break;
+            case Key.Down:
+                VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 5);
+                e.Handled = true;
+                break;
+            case Key.M:
+                Mute_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.F:
+            case Key.F11:
+                ToggleFullscreen();
+                e.Handled = true;
+                break;
+            case Key.Escape when WindowStyle == WindowStyle.None:
+                ToggleFullscreen();
+                e.Handled = true;
+                break;
+            case Key.O when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                Open_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                Stop_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                Playlist_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.T when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                Theme_Click(sender, e);
+                e.Handled = true;
+                break;
+        }
+
+        ArmAutoHide();
     }
 
     private void ToggleFullscreen()
@@ -428,6 +504,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         Dispatcher.BeginInvoke(ResizeRenderHost, DispatcherPriority.Loaded);
+        ArmAutoHide();
     }
 
     private void Sub_Click(object sender, RoutedEventArgs e)
@@ -446,6 +523,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         TrackFlyout.Visibility = Visibility.Collapsed;
         _flyoutKind = null;
+        ArmAutoHide();
     }
 
     private void ToggleTrackFlyout(MediaTrackKind kind, string title)
@@ -454,6 +532,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             TrackFlyout.Visibility = Visibility.Collapsed;
             _flyoutKind = null;
+            ArmAutoHide();
             return;
         }
 
@@ -463,6 +542,8 @@ public partial class MainWindow : Window, IPlaybackObserver
         TrackFlyout.Visibility = Visibility.Visible;
         PlaylistPanel.Visibility = Visibility.Collapsed;
         SideColumn.Width = new GridLength(0);
+        ShowChrome();
+        _autoHideTimer.Stop();
     }
 
     private void PopulateTrackList(MediaTrackKind kind)
@@ -529,6 +610,12 @@ public partial class MainWindow : Window, IPlaybackObserver
             TrackFlyout.Visibility = Visibility.Collapsed;
             _flyoutKind = null;
             RefreshPlaylistUi();
+            ShowChrome();
+            _autoHideTimer.Stop();
+        }
+        else
+        {
+            ArmAutoHide();
         }
     }
 
@@ -539,9 +626,13 @@ public partial class MainWindow : Window, IPlaybackObserver
             return;
         }
 
+        PersistResume();
         _playlist.PlayAt(PlaylistList.SelectedIndex);
+        SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
+        RefreshPlaylistUi();
         _positionTimer.Start();
+        ArmAutoHide();
     }
 
     private void RefreshPlaylistUi()
@@ -561,6 +652,222 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    // --- S6 theme / auto-hide / resume ---
+
+    private void Theme_Click(object sender, RoutedEventArgs e)
+    {
+        _theme = _theme switch
+        {
+            AppThemeMode.Dark => AppThemeMode.Light,
+            AppThemeMode.Light => AppThemeMode.System,
+            _ => AppThemeMode.Dark
+        };
+        ApplyTheme(_theme);
+        RefreshThemeButton();
+    }
+
+    private void RefreshThemeButton()
+    {
+        ThemeButton.ToolTip = $"Theme: {_theme} (click to cycle)";
+        ThemeButton.Content = _theme switch
+        {
+            AppThemeMode.Dark => "◐",
+            AppThemeMode.Light => "◑",
+            _ => "◎"
+        };
+    }
+
+    private void ApplyTheme(AppThemeMode mode)
+    {
+        var useDark = mode switch
+        {
+            AppThemeMode.Dark => true,
+            AppThemeMode.Light => false,
+            AppThemeMode.System => !IsSystemLightTheme(),
+            _ => true
+        };
+
+        var bg = useDark ? Color.FromRgb(0x12, 0x12, 0x12) : Color.FromRgb(0xF2, 0xF2, 0xF2);
+        var fg = useDark ? Color.FromRgb(0xF0, 0xF0, 0xF0) : Color.FromRgb(0x1A, 0x1A, 0x1A);
+        var chrome = useDark ? Color.FromArgb(0xE6, 0x12, 0x12, 0x12) : Color.FromArgb(0xE6, 0xF2, 0xF2, 0xF2);
+        Background = new SolidColorBrush(bg);
+        Foreground = new SolidColorBrush(fg);
+        BottomChrome.Background = new SolidColorBrush(chrome);
+        StatusText.Foreground = new SolidColorBrush(useDark ? Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xA0, 0x00, 0x00, 0x00));
+    }
+
+    private static bool IsSystemLightTheme()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            var value = key?.GetValue("AppsUseLightTheme");
+            return value is int i && i == 1;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void Root_MouseMove(object sender, MouseEventArgs e)
+    {
+        ShowChrome();
+        ArmAutoHide();
+    }
+
+    private void ShowChrome()
+    {
+        BottomChrome.Opacity = 1;
+        BottomChrome.IsHitTestVisible = true;
+    }
+
+    private void TryAutoHideChrome()
+    {
+        _autoHideTimer.Stop();
+        if (ShouldPauseAutoHide())
+        {
+            return;
+        }
+
+        if (_facade?.GetState() != PlaybackState.Playing)
+        {
+            return;
+        }
+
+        // Opacity-only hide (Blur OFF, no Invalidate spam).
+        BottomChrome.Opacity = 0;
+        BottomChrome.IsHitTestVisible = false;
+    }
+
+    private bool ShouldPauseAutoHide() =>
+        TrackFlyout.Visibility == Visibility.Visible
+        || PlaylistPanel.Visibility == Visibility.Visible
+        || ErrorText.Visibility == Visibility.Visible;
+
+    private void ArmAutoHide()
+    {
+        ShowChrome();
+        _autoHideTimer.Stop();
+        if (!ShouldPauseAutoHide() && _facade?.GetState() == PlaybackState.Playing)
+        {
+            _autoHideTimer.Start();
+        }
+    }
+
+    private void PersistResume()
+    {
+        if (_resume is null || string.IsNullOrWhiteSpace(_currentPath) || _facade is null)
+        {
+            return;
+        }
+
+        _resume.Save(_currentPath, _facade.GetPosition(), _facade.GetDuration());
+    }
+
+    private void TryRestoreResume(string path)
+    {
+        if (_resume is null || _facade is null || !_resume.TryLoad(path, out var pos) || pos < 1)
+        {
+            return;
+        }
+
+        // Defer seek until file is opening/playing.
+        Dispatcher.BeginInvoke(() =>
+        {
+            _facade.Seek(pos);
+            StatusText.Text = $"Resumed at {FormatTime(pos, true)}";
+        }, DispatcherPriority.Background);
+    }
+
+    public void OnFirstFrame()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            StatusText.Text = "First frame";
+            ResizeRenderHost();
+            _positionTimer.Start();
+            PollPosition();
+            if (_flyoutKind is MediaTrackKind kind)
+            {
+                PopulateTrackList(kind);
+            }
+
+            RefreshPlaylistUi();
+            ArmAutoHide();
+            if (!string.IsNullOrWhiteSpace(_currentPath))
+            {
+                TryRestoreResume(_currentPath);
+            }
+        });
+    }
+
+    public void OnStateChanged(PlaybackState state)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            StatusText.Text = $"State: {state}";
+            if (state is PlaybackState.Playing or PlaybackState.Opening or PlaybackState.Paused)
+            {
+                _positionTimer.Start();
+            }
+
+            if (state is PlaybackState.Paused or PlaybackState.Stopped or PlaybackState.Ended)
+            {
+                PersistResume();
+                ShowChrome();
+                _autoHideTimer.Stop();
+            }
+            else if (state == PlaybackState.Playing)
+            {
+                ArmAutoHide();
+            }
+
+            RefreshTransportEnabled();
+            RefreshPlaylistUi();
+            SyncMuteFromEngine();
+        });
+    }
+
+    public void OnError(string code, string message, bool recoverable)
+    {
+        Dispatcher.Invoke(() => ShowError($"[{code}] {message} (recoverable={recoverable})"));
+    }
+
+    public void OnHardwareAccelChanged(bool active, string reason)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            StatusText.Text = active
+                ? $"HW accel active: {reason}"
+                : $"HW accel inactive: {reason}";
+        });
+    }
+
+    public void OnPositionChanged(double positionSeconds, double durationSeconds)
+    {
+        Dispatcher.Invoke(() => ApplyTimeline(positionSeconds, durationSeconds));
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        PersistResume();
+        _positionTimer.Stop();
+        _autoHideTimer.Stop();
+        try
+        {
+            _facade?.RenderHost?.Detach();
+            _facade?.RemoveObserver(this);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        base.OnClosed(e);
+    }
+
     private sealed class TrackListItem
     {
         public TrackListItem(string label, int id, MediaTrackKind kind)
@@ -574,21 +881,5 @@ public partial class MainWindow : Window, IPlaybackObserver
         public int Id { get; }
         public MediaTrackKind Kind { get; }
         public override string ToString() => Label;
-    }
-
-    protected override void OnClosed(EventArgs e)
-    {
-        _positionTimer.Stop();
-        try
-        {
-            _facade?.RenderHost?.Detach();
-            _facade?.RemoveObserver(this);
-        }
-        catch
-        {
-            // ignore
-        }
-
-        base.OnClosed(e);
     }
 }
