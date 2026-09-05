@@ -30,6 +30,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
 
+    // KI-014 Soft: absolute drop counters + Δrate between samples (≠ perceived stutter).
+    private long? _prevFrameDrop;
+    private long? _prevDecoderDrop;
+    private long? _prevVoDrop;
+    private DateTime _prevDropSampleUtc = DateTime.MinValue;
+
     public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -59,6 +65,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     {
         _pendingOpen = path;
         _firstFrameRaised = false;
+        ResetDropBaselines();
         SetState(PlaybackState.Opening);
         _logger.Open(path);
         if (_mpv == nint.Zero)
@@ -678,24 +685,85 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return;
         }
 
-        _lastMetricsUtc = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
+        _lastMetricsUtc = now;
 
         var vo = MpvNative.GetPropertyAndFree(_mpv, "current-vo")
                  ?? MpvNative.GetPropertyAndFree(_mpv, "vo")
                  ?? "(unknown)";
         var gpuContext = MpvNative.GetPropertyAndFree(_mpv, "gpu-context") ?? "(unknown)";
         var hwdec = MpvNative.GetPropertyAndFree(_mpv, "hwdec-current") ?? "(unknown)";
-        var frameDrop = MpvNative.GetPropertyAndFree(_mpv, "frame-drop-count")
-                        ?? MpvNative.GetPropertyAndFree(_mpv, "drop-frame-count")
-                        ?? "(n/a)";
-        var decoderDrop = MpvNative.GetPropertyAndFree(_mpv, "decoder-frame-drop-count") ?? "(n/a)";
-        var voDrop = MpvNative.GetPropertyAndFree(_mpv, "vo-delayed-frame-count") ?? "(n/a)";
+        var frameDropRaw = MpvNative.GetPropertyAndFree(_mpv, "frame-drop-count")
+                           ?? MpvNative.GetPropertyAndFree(_mpv, "drop-frame-count");
+        var decoderDropRaw = MpvNative.GetPropertyAndFree(_mpv, "decoder-frame-drop-count");
+        var voDropRaw = MpvNative.GetPropertyAndFree(_mpv, "vo-delayed-frame-count");
+
+        var frameDrop = frameDropRaw ?? "(n/a)";
+        var decoderDrop = decoderDropRaw ?? "(n/a)";
+        var voDrop = voDropRaw ?? "(n/a)";
+        var deltaPart = FormatDropDeltas(now, frameDropRaw, decoderDropRaw, voDropRaw);
 
         _logger.Log(
             "info",
             "render_path",
             $"phase={phase} vo={vo} gpu-context={gpuContext} hwdec-current={hwdec} "
-            + $"frame-drop={frameDrop} decoder-drop={decoderDrop} vo-drop={voDrop}");
+            + $"frame-drop={frameDrop} decoder-drop={decoderDrop} vo-drop={voDrop}{deltaPart}");
+    }
+
+    private void ResetDropBaselines()
+    {
+        _prevFrameDrop = null;
+        _prevDecoderDrop = null;
+        _prevVoDrop = null;
+        _prevDropSampleUtc = DateTime.MinValue;
+    }
+
+    /// <summary>
+    /// KI-014 Soft: log Δ and /s rate between samples. Cumulative frame-drop-count is not stutter.
+    /// </summary>
+    private string FormatDropDeltas(DateTime now, string? frameRaw, string? decoderRaw, string? voRaw)
+    {
+        static bool TryParseLong(string? s, out long v) =>
+            long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out v);
+
+        var hasPrev = _prevDropSampleUtc != DateTime.MinValue
+                      && _prevFrameDrop.HasValue;
+        var dt = hasPrev ? (now - _prevDropSampleUtc).TotalSeconds : 0;
+
+        string FormatOne(string name, string? raw, long? prev)
+        {
+            if (!TryParseLong(raw, out var cur) || !hasPrev || prev is null || dt <= 0)
+            {
+                return $" {name}-delta=(n/a) {name}-rate=(n/a)";
+            }
+
+            var d = cur - prev.Value;
+            var rate = d / dt;
+            return $" {name}-delta={d.ToString(CultureInfo.InvariantCulture)}"
+                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s";
+        }
+
+        var part = FormatOne("frame-drop", frameRaw, _prevFrameDrop)
+                   + FormatOne("decoder-drop", decoderRaw, _prevDecoderDrop)
+                   + FormatOne("vo-drop", voRaw, _prevVoDrop);
+
+        if (TryParseLong(frameRaw, out var fd))
+        {
+            _prevFrameDrop = fd;
+        }
+
+        if (TryParseLong(decoderRaw, out var dd))
+        {
+            _prevDecoderDrop = dd;
+        }
+
+        if (TryParseLong(voRaw, out var vd))
+        {
+            _prevVoDrop = vd;
+        }
+
+        _prevDropSampleUtc = now;
+        return part;
     }
 
     private void ReportHwdec()

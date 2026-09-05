@@ -11,7 +11,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S6 (theme/hotkeys/resume/auto-hide).
+/// Phase A Shell: UX-001 chrome through S8 Soft (resume@first-frame).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -32,6 +32,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private WindowStyle _windowStyleBeforeFullscreen = WindowStyle.SingleBorderWindow;
     private AppThemeMode _theme = AppThemeMode.Dark;
     private string? _currentPath;
+    private double? _pendingResumeSeconds;
 
     public MainWindow()
     {
@@ -149,6 +150,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         TryAttachRenderHost();
         PersistResume();
         _currentPath = dlg.FileName;
+        ArmPendingResume(_currentPath);
 
         if (_playlist is not null)
         {
@@ -226,7 +228,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         _currentPath = _playlist.Items[_playlist.CurrentIndex];
-        TryRestoreResume(_currentPath);
+        ArmPendingResume(_currentPath);
     }
 
     private void RefreshTransportEnabled()
@@ -784,19 +786,28 @@ public partial class MainWindow : Window, IPlaybackObserver
         _resume.Save(_currentPath, _facade.GetPosition(), _facade.GetDuration());
     }
 
-    private void TryRestoreResume(string path)
+    /// <summary>S8 Soft: queue resume position; seek only after first frame (opening race).</summary>
+    private void ArmPendingResume(string path)
     {
-        if (_resume is null || _facade is null || !_resume.TryLoad(path, out var pos) || pos < 1)
+        _pendingResumeSeconds = null;
+        if (_resume is null || string.IsNullOrWhiteSpace(path) || !_resume.TryLoad(path, out var pos) || pos < 1)
         {
             return;
         }
 
-        // Defer seek until file is opening/playing.
-        Dispatcher.BeginInvoke(() =>
+        _pendingResumeSeconds = pos;
+    }
+
+    private void ApplyPendingResumeAtFirstFrame()
+    {
+        if (_facade is null || _pendingResumeSeconds is not double pos)
         {
-            _facade.Seek(pos);
-            StatusText.Text = $"Resumed at {FormatTime(pos, true)}";
-        }, DispatcherPriority.Background);
+            return;
+        }
+
+        _pendingResumeSeconds = null;
+        _facade.Seek(pos);
+        StatusText.Text = $"Resumed at {FormatTime(pos, true)}";
     }
 
     public void OnFirstFrame()
@@ -814,10 +825,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
             RefreshPlaylistUi();
             ArmAutoHide();
-            if (!string.IsNullOrWhiteSpace(_currentPath))
-            {
-                TryRestoreResume(_currentPath);
-            }
+            ApplyPendingResumeAtFirstFrame();
         });
     }
 
