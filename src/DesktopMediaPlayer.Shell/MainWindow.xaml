@@ -9,7 +9,10 @@
         Foreground="#F0F0F0"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
-        KeyDown="Window_KeyDown">
+        KeyDown="Window_KeyDown"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        Drop="Window_Drop">
   <!-- S1–S5: UX-001 chrome. Blur OFF. L1≤2. Facade-only. -->
   <Window.Resources>
     <Style x:Key="TransportButton" TargetType="Button">

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S11 (opening spinner Soft).
+/// Phase A Shell: UX-001 chrome through S12 (drag-drop open Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -145,15 +146,85 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    private static readonly HashSet<string> MediaExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".mkv", ".avi", ".mov", ".webm", ".ts", ".m4v", ".wmv",
+        ".flac", ".mp3", ".m4a", ".aac", ".wav", ".ogg"
+    };
+
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
         {
             Title = "Open media file",
-            Filter = "Media files|*.mp4;*.mkv;*.avi;*.mov;*.webm;*.ts;*.m4v;*.wmv|All files|*.*"
+            Filter = "Media files|*.mp4;*.mkv;*.avi;*.mov;*.webm;*.ts;*.m4v;*.wmv|All files|*.*",
+            Multiselect = true
         };
 
-        if (dlg.ShowDialog(this) != true)
+        if (dlg.ShowDialog(this) != true || dlg.FileNames.Length == 0)
+        {
+            return;
+        }
+
+        OpenMediaFiles(dlg.FileNames);
+    }
+
+    // --- S12 Drag-Drop Open Soft ---
+
+    private void Window_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = HasDroppableMedia(e.Data) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (!TryGetDroppedMediaPaths(e.Data, out var paths) || paths.Count == 0)
+        {
+            return;
+        }
+
+        OpenMediaFiles(paths);
+        e.Handled = true;
+    }
+
+    private static bool HasDroppableMedia(IDataObject data) =>
+        TryGetDroppedMediaPaths(data, out var paths) && paths.Count > 0;
+
+    private static bool TryGetDroppedMediaPaths(IDataObject data, out List<string> paths)
+    {
+        paths = new List<string>();
+        if (data is null || !data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return false;
+        }
+
+        if (data.GetData(DataFormats.FileDrop) is not string[] files)
+        {
+            return false;
+        }
+
+        foreach (var file in files)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
+            {
+                continue;
+            }
+
+            var ext = Path.GetExtension(file);
+            if (MediaExtensions.Contains(ext))
+            {
+                paths.Add(file);
+            }
+        }
+
+        return paths.Count > 0;
+    }
+
+    /// <summary>Same path as Open: playlist Add+PlayAt first, else Facade Open. No new engine API.</summary>
+    private void OpenMediaFiles(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
         {
             return;
         }
@@ -161,18 +232,26 @@ public partial class MainWindow : Window, IPlaybackObserver
         ErrorText.Visibility = Visibility.Collapsed;
         TryAttachRenderHost();
         PersistResume();
-        _currentPath = dlg.FileName;
+
+        var first = paths[0];
+        _currentPath = first;
         _subtitleOffsetSeconds = 0;
         ArmPendingResume(_currentPath);
 
         if (_playlist is not null)
         {
-            _playlist.Add(dlg.FileName);
-            _playlist.PlayAt(_playlist.Items.Count - 1);
+            var startIndex = _playlist.Items.Count;
+            foreach (var path in paths)
+            {
+                _playlist.Add(path);
+            }
+
+            _playlist.PlayAt(startIndex);
+            SyncCurrentPathFromPlaylist();
         }
         else
         {
-            _facade?.Open(dlg.FileName);
+            _facade?.Open(first);
         }
 
         RefreshTransportEnabled();
