@@ -12,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S12 (drag-drop open Soft).
+/// Phase A Shell: UX-001 chrome through S14 (window mousewheel volume Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -385,9 +385,55 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void VolumeGroup_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        var delta = e.Delta > 0 ? 5 : -5;
-        VolumeSlider.Value = Math.Clamp(VolumeSlider.Value + delta, 0, 100);
+        AdjustVolumeByWheel(e.Delta);
         e.Handled = true;
+    }
+
+    // --- S14 Window mousewheel volume Soft ---
+
+    private void Window_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // Volume group already handles its own wheel; skip double-step when source is there.
+        if (e.OriginalSource is DependencyObject d
+            && IsDescendantOf(d, VolumeGroup))
+        {
+            return;
+        }
+
+        AdjustVolumeByWheel(e.Delta);
+        e.Handled = true;
+    }
+
+    private void AdjustVolumeByWheel(int wheelDelta)
+    {
+        var step = wheelDelta > 0 ? 5 : -5;
+        VolumeSlider.Value = Math.Clamp(VolumeSlider.Value + step, 0, 100);
+        // VolumeSlider_ValueChanged → Facade SetVolume
+        ShowVolumeOsd();
+    }
+
+    private static bool IsDescendantOf(DependencyObject? node, DependencyObject ancestor)
+    {
+        while (node is not null)
+        {
+            if (ReferenceEquals(node, ancestor))
+            {
+                return true;
+            }
+
+            node = VisualTreeHelper.GetParent(node);
+        }
+
+        return false;
+    }
+
+    private void ShowVolumeOsd()
+    {
+        SubtitleOsdText.Text = $"Volume {(int)Math.Round(VolumeSlider.Value)}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
     }
 
     private void RefreshMuteGlyph()

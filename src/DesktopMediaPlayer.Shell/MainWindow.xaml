@@ -12,7 +12,8 @@
         KeyDown="Window_KeyDown"
         AllowDrop="True"
         DragOver="Window_DragOver"
-        Drop="Window_Drop">
+        Drop="Window_Drop"
+        PreviewMouseWheel="Window_PreviewMouseWheel">
   <!-- S1–S5: UX-001 chrome. Blur OFF. L1≤2. Facade-only. -->
   <Window.Resources>
     <Style x:Key="TransportButton" TargetType="Button">
