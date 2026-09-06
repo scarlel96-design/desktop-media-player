@@ -1,7 +1,7 @@
 # Phase A — S11 Opening Spinner Soft
 
 ## Delivered (Shell-only)
-- Center indeterminate  () when 
+- Center indeterminate ProgressBar (OpeningSpinner) when PlaybackState.Opening
 - Hide on FirstFrame · Playing · Error · Stopped · Ended · Idle · window Closed
 - Opacity-only (0.9) · no modal · Blur OFF
 
