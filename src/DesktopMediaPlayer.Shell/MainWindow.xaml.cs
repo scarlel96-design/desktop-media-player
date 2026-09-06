@@ -419,12 +419,14 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         var bufferedEnd = _facade.GetBufferedEndSeconds();
-        if (bufferedEnd < positionSeconds)
+        BufferBar.Maximum = 1;
+        // Soft: 0 from Facade (no cache) → empty bar; never invent from position.
+        if (bufferedEnd <= 0)
         {
-            bufferedEnd = positionSeconds;
+            BufferBar.Value = 0;
+            return;
         }
 
-        BufferBar.Maximum = 1;
         BufferBar.Value = Math.Clamp(bufferedEnd / _durationSeconds, 0, 1);
     }
 

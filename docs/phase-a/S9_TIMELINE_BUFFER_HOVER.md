@@ -2,6 +2,7 @@
 
 ## Delivered (AC-UI-1 residual)
 - Buffer bar under Seek (`ProgressBar`) from Facade `GetBufferedEndSeconds()` (mpv demuxer/cache duration + position)
+- Soft: cache property = 0 → empty bar (real data; no position-fake)
 - Hover time tooltip on timeline · throttle **≤100ms**
 - Seek remains Facade-only
 

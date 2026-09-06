@@ -283,8 +283,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             cache = Parse(MpvNative.GetPropertyAndFree(_mpv, "cache-duration"));
         }
 
+        // Soft (수석): cache=0 → empty (real property). Do not fake buffer from position alone.
+        if (cache <= 0)
+        {
+            return 0;
+        }
+
         var dur = Parse(MpvNative.GetPropertyAndFree(_mpv, "duration"));
-        var end = pos + Math.Max(0, cache);
+        var end = pos + cache;
         if (dur > 0)
         {
             end = Math.Min(end, dur);
