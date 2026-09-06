@@ -209,6 +209,12 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INative
         return _inner.GetMediaInfo();
     }
 
+    public double GetBufferedEndSeconds()
+    {
+        ThrowIfDisposed();
+        return _inner.GetBufferedEndSeconds();
+    }
+
     public void OnFirstFrame() => FanOut(o => o.OnFirstFrame());
 
     public void OnStateChanged(PlaybackState state) => FanOut(o => o.OnStateChanged(state));

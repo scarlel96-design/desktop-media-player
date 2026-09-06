@@ -11,7 +11,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S8 Soft (resume@first-frame).
+/// Phase A Shell: UX-001 chrome through S9 (timeline buffer + hover time).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -33,6 +33,8 @@ public partial class MainWindow : Window, IPlaybackObserver
     private AppThemeMode _theme = AppThemeMode.Dark;
     private string? _currentPath;
     private double? _pendingResumeSeconds;
+    private DateTime _lastHoverUtc = DateTime.MinValue;
+    private static readonly TimeSpan HoverThrottle = TimeSpan.FromMilliseconds(100);
 
     public MainWindow()
     {
@@ -331,6 +333,38 @@ public partial class MainWindow : Window, IPlaybackObserver
         CommitSeek();
     }
 
+
+    // --- S9 buffer / hover time ---
+
+    private void SeekArea_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_durationSeconds <= 0 || SeekSlider.ActualWidth <= 0)
+        {
+            HoverTimePopup.IsOpen = false;
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (now - _lastHoverUtc < HoverThrottle)
+        {
+            return;
+        }
+
+        _lastHoverUtc = now;
+        var x = e.GetPosition(SeekSlider).X;
+        var ratio = Math.Clamp(x / SeekSlider.ActualWidth, 0, 1);
+        var seconds = ratio * _durationSeconds;
+        HoverTimeText.Text = FormatTime(seconds, durationKnown: true);
+        HoverTimePopup.HorizontalOffset = Math.Clamp(x - 20, 0, SeekSlider.ActualWidth - 40);
+        HoverTimePopup.VerticalOffset = -28;
+        HoverTimePopup.IsOpen = true;
+    }
+
+    private void SeekArea_MouseLeave(object sender, MouseEventArgs e)
+    {
+        HoverTimePopup.IsOpen = false;
+    }
+
     private void CommitSeek()
     {
         _facade?.Seek(SeekSlider.Value);
@@ -357,6 +391,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         _durationSeconds = durationSeconds > 0 ? durationSeconds : _durationSeconds;
         UpdateTimeLabels(positionSeconds, _durationSeconds);
+        UpdateBufferBar(positionSeconds);
 
         if (_seekDragging)
         {
@@ -368,6 +403,29 @@ public partial class MainWindow : Window, IPlaybackObserver
             SeekSlider.Maximum = _durationSeconds;
             SeekSlider.Value = Math.Clamp(positionSeconds, 0, _durationSeconds);
         }
+    }
+
+    private void UpdateBufferBar(double positionSeconds)
+    {
+        if (_facade is null || BufferBar is null)
+        {
+            return;
+        }
+
+        if (_durationSeconds <= 0)
+        {
+            BufferBar.Value = 0;
+            return;
+        }
+
+        var bufferedEnd = _facade.GetBufferedEndSeconds();
+        if (bufferedEnd < positionSeconds)
+        {
+            bufferedEnd = positionSeconds;
+        }
+
+        BufferBar.Maximum = 1;
+        BufferBar.Value = Math.Clamp(bufferedEnd / _durationSeconds, 0, 1);
     }
 
     private void UpdateTimeLabels(double positionSeconds, double durationSeconds)

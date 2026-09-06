@@ -24,4 +24,6 @@ public interface IPlaybackEngine : IDisposable
     void SetSubtitleOffset(double seconds);
     void Screenshot(string path);
     MediaInfoBasics GetMediaInfo();
+    /// <summary>Buffered end time (seconds). Soft: position + demuxer cache; 0 if unknown.</summary>
+    double GetBufferedEndSeconds();
 }

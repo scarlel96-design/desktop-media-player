@@ -8,5 +8,5 @@
 - Soft CS0108: `VideoHwndHost.ChildHwnd` (no longer hides `HwndHost.Handle`)
 
 ## Out of scope (later)
-- Buffer bar / hover time tooltip (AC-UI-1 partial)
+- Buffer bar / hover time tooltip → **S9**
 - Thumbnail / chapters

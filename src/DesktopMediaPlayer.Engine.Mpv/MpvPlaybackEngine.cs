@@ -266,6 +266,34 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
     }
 
+    public double GetBufferedEndSeconds()
+    {
+        if (_mpv == nint.Zero)
+        {
+            return 0;
+        }
+
+        static double Parse(string? s) =>
+            double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
+
+        var pos = Parse(MpvNative.GetPropertyAndFree(_mpv, "time-pos"));
+        var cache = Parse(MpvNative.GetPropertyAndFree(_mpv, "demuxer-cache-duration"));
+        if (cache <= 0)
+        {
+            cache = Parse(MpvNative.GetPropertyAndFree(_mpv, "cache-duration"));
+        }
+
+        var dur = Parse(MpvNative.GetPropertyAndFree(_mpv, "duration"));
+        var end = pos + Math.Max(0, cache);
+        if (dur > 0)
+        {
+            end = Math.Min(end, dur);
+        }
+
+        return end;
+    }
+
+
     public IReadOnlyList<MediaTrackInfo> ListTracks()
     {
         if (_mpv == nint.Zero)

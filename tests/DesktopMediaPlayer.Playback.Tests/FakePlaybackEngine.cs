@@ -84,6 +84,8 @@ internal sealed class FakePlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public double GetDuration() => _duration;
 
+    public double GetBufferedEndSeconds() => Math.Min(_duration, _position + 30);
+
     public IReadOnlyList<MediaTrackInfo> ListTracks() => _tracks.ToArray();
 
     public void SelectTrack(MediaTrackKind kind, int id)

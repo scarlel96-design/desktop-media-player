@@ -72,12 +72,26 @@
             <TextBlock x:Name="CurrentTimeText" Grid.Column="0"
                        Style="{StaticResource ChromeCaption}"
                        Text="--:--" Margin="0,0,12,0"/>
-            <Slider x:Name="SeekSlider" Grid.Column="1"
-                    Minimum="0" Maximum="3600" Value="0"
-                    VerticalAlignment="Center" Height="24"
-                    IsMoveToPointEnabled="True"
-                    PreviewMouseLeftButtonUp="SeekSlider_Committed"
-                    LostMouseCapture="SeekSlider_LostCapture"/>
+            <Grid Grid.Column="1" MinHeight="24" VerticalAlignment="Center"
+                  MouseMove="SeekArea_MouseMove" MouseLeave="SeekArea_MouseLeave">
+              <ProgressBar x:Name="BufferBar" Height="4" Minimum="0" Maximum="1" Value="0"
+                           VerticalAlignment="Center" IsHitTestVisible="False"
+                           Foreground="#4466AA" Background="#22FFFFFF" BorderThickness="0"/>
+              <Slider x:Name="SeekSlider"
+                      Minimum="0" Maximum="3600" Value="0"
+                      VerticalAlignment="Center" Height="24"
+                      Background="Transparent"
+                      IsMoveToPointEnabled="True"
+                      PreviewMouseLeftButtonUp="SeekSlider_Committed"
+                      LostMouseCapture="SeekSlider_LostCapture"/>
+              <Popup x:Name="HoverTimePopup" AllowsTransparency="True" Placement="Relative"
+                     PlacementTarget="{Binding ElementName=SeekSlider}" IsOpen="False"
+                     IsHitTestVisible="False">
+                <Border Background="#E0181818" CornerRadius="4" Padding="8,4">
+                  <TextBlock x:Name="HoverTimeText" Foreground="#EEE" FontSize="12"/>
+                </Border>
+              </Popup>
+            </Grid>
             <TextBlock x:Name="TotalTimeText" Grid.Column="2"
                        Style="{StaticResource ChromeCaption}"
                        Text="--:--" Margin="12,0,0,0"/>
