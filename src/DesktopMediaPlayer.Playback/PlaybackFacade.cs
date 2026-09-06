@@ -1,3 +1,4 @@
+using System.Threading;
 using DesktopMediaPlayer.Contracts;
 
 namespace DesktopMediaPlayer.Playback;
@@ -12,12 +13,23 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INative
     private INativeRuntimeProbe? _probe;
     private readonly object _observersGate = new();
     private readonly List<IPlaybackObserver> _observers = new();
+    private readonly object _positionGate = new();
+    private static readonly TimeSpan PositionThrottle = TimeSpan.FromMilliseconds(100);
+    private readonly Timer _positionTimer;
+    private DateTime _lastPositionFanOutUtc = DateTime.MinValue;
+    private double _pendingPosition;
+    private double _pendingDuration;
+    private double _lastDeliveredPosition = double.NaN;
+    private double _lastDeliveredDuration = double.NaN;
+    private bool _positionPending;
+    private bool _positionTimerArmed;
     private bool _disposed;
 
     public PlaybackFacade(IPlaybackEngine inner, params IPlaybackObserver[] observers)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _probe = inner as INativeRuntimeProbe;
+        _positionTimer = new Timer(PositionTimerCallback, null, Timeout.Infinite, Timeout.Infinite);
         if (observers is { Length: > 0 })
         {
             foreach (var o in observers)
@@ -225,8 +237,83 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INative
     public void OnHardwareAccelChanged(bool active, string reason) =>
         FanOut(o => o.OnHardwareAccelChanged(active, reason));
 
-    public void OnPositionChanged(double positionSeconds, double durationSeconds) =>
-        FanOut(o => o.OnPositionChanged(positionSeconds, durationSeconds));
+    /// <summary>S13 Soft: fan-out ≤100ms; suppress identical (pos,dur); always deliver latest pending.</summary>
+    public void OnPositionChanged(double positionSeconds, double durationSeconds)
+    {
+        lock (_positionGate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            // Identical to pending or last delivered → suppress.
+            if ((_positionPending
+                 && NearlyEqual(_pendingPosition, positionSeconds)
+                 && NearlyEqual(_pendingDuration, durationSeconds))
+                || (NearlyEqual(_lastDeliveredPosition, positionSeconds)
+                    && NearlyEqual(_lastDeliveredDuration, durationSeconds)))
+            {
+                return;
+            }
+
+            _pendingPosition = positionSeconds;
+            _pendingDuration = durationSeconds;
+            _positionPending = true;
+
+            var elapsed = DateTime.UtcNow - _lastPositionFanOutUtc;
+            if (elapsed >= PositionThrottle)
+            {
+                EmitPendingPositionLocked();
+                return;
+            }
+
+            if (_positionTimerArmed)
+            {
+                return;
+            }
+
+            var delay = PositionThrottle - elapsed;
+            if (delay < TimeSpan.Zero)
+            {
+                delay = TimeSpan.Zero;
+            }
+
+            _positionTimerArmed = true;
+            _positionTimer.Change(delay, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void PositionTimerCallback(object? state)
+    {
+        lock (_positionGate)
+        {
+            _positionTimerArmed = false;
+            if (_disposed || !_positionPending)
+            {
+                return;
+            }
+
+            EmitPendingPositionLocked();
+        }
+    }
+
+    private void EmitPendingPositionLocked()
+    {
+        var pos = _pendingPosition;
+        var dur = _pendingDuration;
+        _positionPending = false;
+        _lastDeliveredPosition = pos;
+        _lastDeliveredDuration = dur;
+        _lastPositionFanOutUtc = DateTime.UtcNow;
+        // Fan-out outside nested observer risks: still under lock briefly — copy then release.
+        // Call FanOut while holding lock is OK (observers shouldn't re-enter position).
+        FanOut(o => o.OnPositionChanged(pos, dur));
+    }
+
+    private static bool NearlyEqual(double a, double b) =>
+        (double.IsNaN(a) && double.IsNaN(b))
+        || Math.Abs(a - b) < 1e-9;
 
     private void FanOut(Action<IPlaybackObserver> action)
     {
@@ -258,7 +345,19 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INative
             return;
         }
 
-        _disposed = true;
+        lock (_positionGate)
+        {
+            _disposed = true;
+            _positionTimerArmed = false;
+            _positionTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            if (_positionPending)
+            {
+                EmitPendingPositionLocked();
+            }
+
+            _positionTimer.Dispose();
+        }
+
         _inner.Dispose();
         lock (_observersGate)
         {

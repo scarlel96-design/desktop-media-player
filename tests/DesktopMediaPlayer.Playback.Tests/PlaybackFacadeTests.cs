@@ -176,4 +176,23 @@ public sealed class PlaybackFacadeTests
         Assert.False(playlist.CanPlayPrevious);
         Assert.Contains("Stop", fake.Calls);
     }
+
+    [Fact]
+    public async Task OnPositionChanged_Throttles_And_DeliversLatest()
+    {
+        var fake = new FakePlaybackEngine();
+        var observer = new RecordingObserver();
+        using var facade = new PlaybackFacade(fake, observer);
+
+        facade.OnPositionChanged(1, 10);
+        facade.OnPositionChanged(1, 10);
+        facade.OnPositionChanged(2, 10);
+        facade.OnPositionChanged(3, 10);
+
+        await Task.Delay(150);
+
+        Assert.True(observer.Positions.Count >= 1);
+        Assert.True(observer.Positions.Count <= 3);
+        Assert.Equal((3.0, 10.0), observer.Positions[^1]);
+    }
 }
