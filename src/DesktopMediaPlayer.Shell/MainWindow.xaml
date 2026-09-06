@@ -51,6 +51,13 @@
         <local:VideoHwndHost x:Name="VideoHost"/>
       </Border>
 
+      <!-- S11 Opening spinner (Opacity-only, Shell-only) -->
+      <ProgressBar x:Name="OpeningSpinner" Width="48" Height="48"
+                   IsIndeterminate="True" IsHitTestVisible="False"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Visibility="Collapsed" Opacity="0.9"
+                   Foreground="#CCFFFFFF" Background="Transparent" BorderThickness="0"/>
+
       <!-- L1 bottom chrome -->
       <Border x:Name="BottomChrome"
               VerticalAlignment="Bottom"

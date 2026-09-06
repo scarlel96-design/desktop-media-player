@@ -11,7 +11,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S10 (subtitle offset + OSD).
+/// Phase A Shell: UX-001 chrome through S11 (opening spinner Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -511,6 +511,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void ShowError(string message)
     {
+        SetOpeningSpinner(false);
         ErrorText.Text = message;
         ErrorText.Visibility = Visibility.Visible;
         StatusText.Text = "Error";
@@ -937,10 +938,26 @@ public partial class MainWindow : Window, IPlaybackObserver
         StatusText.Text = $"Resumed at {FormatTime(pos, true)}";
     }
 
+
+    // --- S11 Opening spinner Soft ---
+
+    private void SetOpeningSpinner(bool visible)
+    {
+        if (OpeningSpinner is null)
+        {
+            return;
+        }
+
+        OpeningSpinner.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        OpeningSpinner.Opacity = visible ? 0.9 : 0;
+        OpeningSpinner.IsIndeterminate = visible;
+    }
+
     public void OnFirstFrame()
     {
         Dispatcher.Invoke(() =>
         {
+            SetOpeningSpinner(false);
             StatusText.Text = "First frame";
             ResizeRenderHost();
             _positionTimer.Start();
@@ -961,6 +978,8 @@ public partial class MainWindow : Window, IPlaybackObserver
         Dispatcher.Invoke(() =>
         {
             StatusText.Text = $"State: {state}";
+            SetOpeningSpinner(state == PlaybackState.Opening);
+
             if (state is PlaybackState.Playing or PlaybackState.Opening or PlaybackState.Paused)
             {
                 _positionTimer.Start();
@@ -975,6 +994,12 @@ public partial class MainWindow : Window, IPlaybackObserver
             else if (state == PlaybackState.Playing)
             {
                 ArmAutoHide();
+            }
+
+            if (state is PlaybackState.Stopped or PlaybackState.Ended or PlaybackState.Error
+                or PlaybackState.Idle)
+            {
+                SetOpeningSpinner(false);
             }
 
             RefreshTransportEnabled();
@@ -1081,6 +1106,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         _positionTimer.Stop();
         _autoHideTimer.Stop();
         _osdFadeTimer.Stop();
+        SetOpeningSpinner(false);
         try
         {
             _facade?.RenderHost?.Detach();
