@@ -193,6 +193,11 @@
         <TextBlock x:Name="ErrorText" Foreground="#FF6B6B" Margin="0,6,0,0"
                    TextWrapping="Wrap" Visibility="Collapsed"/>
       </StackPanel>
+
+      <TextBlock x:Name="SubtitleOsdText"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                 FontSize="28" FontWeight="SemiBold" Foreground="#F0FFFFFF"
+                 IsHitTestVisible="False" Opacity="0" Text=""/>
     </Grid>
 
     <!-- Playlist L2 280–320 -->

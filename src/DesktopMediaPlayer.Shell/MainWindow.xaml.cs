@@ -11,7 +11,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S9 (timeline buffer + hover time).
+/// Phase A Shell: UX-001 chrome through S10 (subtitle offset + OSD).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -35,6 +35,11 @@ public partial class MainWindow : Window, IPlaybackObserver
     private double? _pendingResumeSeconds;
     private DateTime _lastHoverUtc = DateTime.MinValue;
     private static readonly TimeSpan HoverThrottle = TimeSpan.FromMilliseconds(100);
+    private double _subtitleOffsetSeconds;
+    private readonly DispatcherTimer _osdFadeTimer;
+    private DateTime _osdShownUtc = DateTime.MinValue;
+    private const double SubtitleOffsetStepSeconds = 0.1;
+    private static readonly TimeSpan OsdVisible = TimeSpan.FromSeconds(1.2);
 
     public MainWindow()
     {
@@ -49,6 +54,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             SyncMuteFromEngine();
         };
 
+        _osdFadeTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+        _osdFadeTimer.Tick += OsdFadeTimer_Tick;
         _autoHideTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = TimeSpan.FromSeconds(2.5)
@@ -152,6 +162,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         TryAttachRenderHost();
         PersistResume();
         _currentPath = dlg.FileName;
+        _subtitleOffsetSeconds = 0;
         ArmPendingResume(_currentPath);
 
         if (_playlist is not null)
@@ -230,6 +241,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         _currentPath = _playlist.Items[_playlist.CurrentIndex];
+        _subtitleOffsetSeconds = 0;
         ArmPendingResume(_currentPath);
     }
 
@@ -363,6 +375,53 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void SeekArea_MouseLeave(object sender, MouseEventArgs e)
     {
         HoverTimePopup.IsOpen = false;
+    }
+
+
+    // --- S10 subtitle offset + OSD ---
+
+    private void AdjustSubtitleOffset(double deltaSeconds)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        _subtitleOffsetSeconds += deltaSeconds;
+        _subtitleOffsetSeconds = Math.Round(_subtitleOffsetSeconds, 1);
+        _facade.SetSubtitleOffset(_subtitleOffsetSeconds);
+        ShowSubtitleOffsetOsd();
+    }
+
+    private void ShowSubtitleOffsetOsd()
+    {
+        var sign = _subtitleOffsetSeconds >= 0 ? "+" : "";
+        SubtitleOsdText.Text = $"Subtitle {sign}{_subtitleOffsetSeconds:0.0}s";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    private void OsdFadeTimer_Tick(object? sender, EventArgs e)
+    {
+        var elapsed = DateTime.UtcNow - _osdShownUtc;
+        if (elapsed < OsdVisible)
+        {
+            SubtitleOsdText.Opacity = 1;
+            return;
+        }
+
+        var fade = (elapsed - OsdVisible).TotalMilliseconds / 300.0;
+        if (fade >= 1)
+        {
+            SubtitleOsdText.Opacity = 0;
+            SubtitleOsdText.Text = "";
+            _osdFadeTimer.Stop();
+            return;
+        }
+
+        SubtitleOsdText.Opacity = Math.Clamp(1.0 - fade, 0, 1);
     }
 
     private void CommitSeek()
@@ -548,6 +607,14 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.OemComma:
                 _facade.FrameStep(-1);
+                e.Handled = true;
+                break;
+            case Key.OemOpenBrackets:
+                AdjustSubtitleOffset(-SubtitleOffsetStepSeconds);
+                e.Handled = true;
+                break;
+            case Key.OemCloseBrackets:
+                AdjustSubtitleOffset(SubtitleOffsetStepSeconds);
                 e.Handled = true;
                 break;
             case Key.F12:
@@ -1013,6 +1080,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         PersistResume();
         _positionTimer.Stop();
         _autoHideTimer.Stop();
+        _osdFadeTimer.Stop();
         try
         {
             _facade?.RenderHost?.Detach();
