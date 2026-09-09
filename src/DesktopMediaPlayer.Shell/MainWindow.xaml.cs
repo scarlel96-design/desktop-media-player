@@ -1076,6 +1076,14 @@ public partial class MainWindow : Window, IPlaybackObserver
     }
 
 
+
+    // --- S19 Theme prefs Soft ---
+
+    private static AppThemeMode LoadInitialTheme() =>
+        ThemePrefsStore.TryLoad(out var theme) ? theme : AppThemeMode.Dark;
+
+    private void PersistThemePrefs() => ThemePrefsStore.Persist(_theme);
+
     // --- S18 Volume prefs Soft ---
 
     private void ApplyPersistedVolumePrefs()
