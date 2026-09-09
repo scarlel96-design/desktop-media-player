@@ -12,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S14 (window mousewheel volume Soft).
+/// Phase A Shell: UX-001 chrome through S15 (Up/Down volume Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -404,9 +404,12 @@ public partial class MainWindow : Window, IPlaybackObserver
         e.Handled = true;
     }
 
-    private void AdjustVolumeByWheel(int wheelDelta)
+    private void AdjustVolumeByWheel(int wheelDelta) =>
+        AdjustVolumeBySteps(wheelDelta > 0 ? 5 : -5);
+
+    /// <summary>S15 Soft: shared volume path (±5) → slider → Facade SetVolume + S14 OSD.</summary>
+    private void AdjustVolumeBySteps(int step)
     {
-        var step = wheelDelta > 0 ? 5 : -5;
         VolumeSlider.Value = Math.Clamp(VolumeSlider.Value + step, 0, 100);
         // VolumeSlider_ValueChanged → Facade SetVolume
         ShowVolumeOsd();
@@ -690,11 +693,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 e.Handled = true;
                 break;
             case Key.Up:
-                VolumeSlider.Value = Math.Min(100, VolumeSlider.Value + 5);
+                AdjustVolumeBySteps(5);
                 e.Handled = true;
                 break;
             case Key.Down:
-                VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 5);
+                AdjustVolumeBySteps(-5);
                 e.Handled = true;
                 break;
             case Key.M:
