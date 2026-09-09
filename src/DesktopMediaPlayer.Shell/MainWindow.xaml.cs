@@ -12,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S16 (always-on-top Soft).
+/// Phase A Shell: UX-001 chrome through S17 (window bounds Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -67,7 +67,28 @@ public partial class MainWindow : Window, IPlaybackObserver
         _autoHideTimer.Tick += (_, _) => TryAutoHideChrome();
 
         Loaded += OnLoaded;
-        SizeChanged += (_, _) => ResizeRenderHost();
+        SizeChanged += (_, _) =>
+        {
+            ResizeRenderHost();
+            if (IsLoaded)
+            {
+                WindowBoundsStore.Persist(this);
+            }
+        };
+        LocationChanged += (_, _) =>
+        {
+            if (IsLoaded)
+            {
+                WindowBoundsStore.Persist(this);
+            }
+        };
+        StateChanged += (_, _) =>
+        {
+            if (IsLoaded)
+            {
+                WindowBoundsStore.Persist(this);
+            }
+        };
         DpiChanged += (_, _) => ResizeRenderHost();
         SeekSlider.PreviewMouseLeftButtonDown += (_, _) => _seekDragging = true;
         SeekSlider.PreviewMouseLeftButtonUp += (_, _) => _seekDragging = false;
@@ -76,6 +97,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        WindowBoundsStore.TryRestore(this);
         var app = (App)Application.Current;
         _facade = app.Facade;
         _playlist = app.Playlist;
@@ -1252,6 +1274,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     protected override void OnClosed(EventArgs e)
     {
+        WindowBoundsStore.Persist(this);
         PersistResume();
         _positionTimer.Stop();
         _autoHideTimer.Stop();
