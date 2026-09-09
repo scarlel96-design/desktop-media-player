@@ -12,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S17 (window bounds Soft).
+/// Phase A Shell: UX-001 chrome through S18 (volume prefs Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -110,11 +110,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         _facade.AddObserver(this);
         RefreshTransportEnabled();
-        VolumeSlider.Value = 80;
-        _lastAudibleVolume = 80;
-        _facade.SetVolume(80);
-        _facade.SetMute(false);
-        RefreshMuteGlyph();
+        ApplyPersistedVolumePrefs();
         RefreshThemeButton();
 
         TryAttachRenderHost();
@@ -379,6 +375,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         RefreshMuteGlyph();
+        PersistVolumePrefs();
     }
 
     private void Mute_Click(object sender, RoutedEventArgs e)
@@ -403,6 +400,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         RefreshMuteGlyph();
+        PersistVolumePrefs();
     }
 
     private void VolumeGroup_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1076,6 +1074,36 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+
+    // --- S18 Volume prefs Soft ---
+
+    private void ApplyPersistedVolumePrefs()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        if (!VolumePrefsStore.TryLoad(out var volume, out var mute))
+        {
+            volume = 80;
+            mute = false;
+        }
+
+        VolumeSlider.Value = volume;
+        _lastAudibleVolume = volume > 0 ? volume : 80;
+        _facade.SetVolume(volume);
+        _muteUi = mute;
+        _facade.SetMute(mute);
+        RefreshMuteGlyph();
+    }
+
+    private void PersistVolumePrefs()
+    {
+        var volume = (int)Math.Round(Math.Clamp(VolumeSlider.Value, 0, 100));
+        VolumePrefsStore.Persist(volume, _muteUi);
+    }
+
     private void PersistResume()
     {
         if (_resume is null || string.IsNullOrWhiteSpace(_currentPath) || _facade is null)
@@ -1275,6 +1303,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     protected override void OnClosed(EventArgs e)
     {
         WindowBoundsStore.Persist(this);
+        PersistVolumePrefs();
         PersistResume();
         _positionTimer.Stop();
         _autoHideTimer.Stop();
