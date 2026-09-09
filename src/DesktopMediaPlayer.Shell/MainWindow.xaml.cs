@@ -12,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S15 (Up/Down volume Soft).
+/// Phase A Shell: UX-001 chrome through S16 (always-on-top Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -430,6 +430,24 @@ public partial class MainWindow : Window, IPlaybackObserver
         return false;
     }
 
+
+    // --- S16 Always-on-top Soft ---
+
+    private void ToggleAlwaysOnTop()
+    {
+        Topmost = !Topmost;
+        ShowTopmostOsd();
+    }
+
+    private void ShowTopmostOsd()
+    {
+        SubtitleOsdText.Text = Topmost ? "Always on top: On" : "Always on top: Off";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     private void ShowVolumeOsd()
     {
         SubtitleOsdText.Text = $"Volume {(int)Math.Round(VolumeSlider.Value)}";
@@ -727,6 +745,10 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.T when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Theme_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.T:
+                ToggleAlwaysOnTop();
                 e.Handled = true;
                 break;
             case Key.OemPeriod:
