@@ -99,6 +99,7 @@
                       VerticalAlignment="Center" Height="24"
                       Background="Transparent"
                       IsMoveToPointEnabled="True"
+                      PreviewMouseLeftButtonDown="SeekSlider_DragStarted"
                       PreviewMouseLeftButtonUp="SeekSlider_Committed"
                       LostMouseCapture="SeekSlider_LostCapture"/>
               <Popup x:Name="HoverTimePopup" AllowsTransparency="True" Placement="Relative"
