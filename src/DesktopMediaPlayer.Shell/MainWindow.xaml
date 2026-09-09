@@ -49,22 +49,28 @@
     </Grid.ColumnDefinitions>
 
     <Grid Grid.Column="0">
-      <!-- L0 video -->
-      <Border Background="#000000"
+      <!-- KI-022 Soft: separate HWND video row from chrome (airspace). video=* / chrome=Auto -->
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <!-- L0 video (row 0 only — HWND must not cover chrome) -->
+      <Border Grid.Row="0" Background="#000000"
               MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
         <local:VideoHwndHost x:Name="VideoHost"/>
       </Border>
 
       <!-- S11 Opening spinner (Opacity-only, Shell-only) -->
-      <ProgressBar x:Name="OpeningSpinner" Width="48" Height="48"
+      <ProgressBar x:Name="OpeningSpinner" Grid.Row="0" Width="48" Height="48"
                    IsIndeterminate="True" IsHitTestVisible="False"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    Visibility="Collapsed" Opacity="0.9"
                    Foreground="#CCFFFFFF" Background="Transparent" BorderThickness="0"/>
 
-      <!-- L1 bottom chrome -->
+      <!-- L1 bottom chrome (own Auto row — outside HWND layout box) -->
       <Border x:Name="BottomChrome"
-              VerticalAlignment="Bottom"
+              Grid.Row="1"
               Background="#E6121212"
               Padding="16,8,16,8">
         <Grid>
@@ -165,7 +171,7 @@
       </Border>
 
       <!-- Track flyout (immediate, non-modal) -->
-      <Border x:Name="TrackFlyout" Style="{StaticResource SidePanel}"
+      <Border x:Name="TrackFlyout" Grid.Row="0" Style="{StaticResource SidePanel}"
               HorizontalAlignment="Right" VerticalAlignment="Bottom"
               Margin="0,0,16,108" Width="280" MaxHeight="280"
               Visibility="Collapsed">
@@ -183,7 +189,7 @@
         </DockPanel>
       </Border>
 
-      <Border x:Name="MediaInfoFlyout" Style="{StaticResource SidePanel}"
+      <Border x:Name="MediaInfoFlyout" Grid.Row="0" Style="{StaticResource SidePanel}"
               HorizontalAlignment="Left" VerticalAlignment="Bottom"
               Margin="16,0,0,108" Width="320" MaxHeight="320"
               Visibility="Collapsed">
@@ -199,13 +205,13 @@
         </DockPanel>
       </Border>
 
-      <StackPanel VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
+      <StackPanel Grid.Row="0" VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
         <TextBlock x:Name="StatusText" Text="Ready" Foreground="#A0FFFFFF" TextWrapping="Wrap"/>
         <TextBlock x:Name="ErrorText" Foreground="#FF6B6B" Margin="0,6,0,0"
                    TextWrapping="Wrap" Visibility="Collapsed"/>
       </StackPanel>
 
-      <TextBlock x:Name="SubtitleOsdText"
+      <TextBlock x:Name="SubtitleOsdText" Grid.Row="0"
                  HorizontalAlignment="Center" VerticalAlignment="Center"
                  FontSize="28" FontWeight="SemiBold" Foreground="#F0FFFFFF"
                  IsHitTestVisible="False" Opacity="0" Text=""/>
