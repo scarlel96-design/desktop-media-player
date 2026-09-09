@@ -12,7 +12,7 @@ using Microsoft.Win32;
 namespace DesktopMediaPlayer.Shell;
 
 /// <summary>
-/// Phase A Shell: UX-001 chrome through S18 (volume prefs Soft).
+/// Phase A Shell: UX-001 chrome through S19 (theme prefs Soft).
 /// Facade-only. Blur OFF. No settings search / P1.
 /// </summary>
 public partial class MainWindow : Window, IPlaybackObserver
@@ -31,7 +31,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private bool _suppressTrackSelection;
     private WindowState _windowStateBeforeFullscreen = WindowState.Normal;
     private WindowStyle _windowStyleBeforeFullscreen = WindowStyle.SingleBorderWindow;
-    private AppThemeMode _theme = AppThemeMode.Dark;
+    private AppThemeMode _theme = LoadInitialTheme();
     private string? _currentPath;
     private double? _pendingResumeSeconds;
     private DateTime _lastHoverUtc = DateTime.MinValue;
@@ -980,6 +980,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _ => AppThemeMode.Dark
         };
         ApplyTheme(_theme);
+        PersistThemePrefs();
         RefreshThemeButton();
     }
 
@@ -1304,6 +1305,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         WindowBoundsStore.Persist(this);
         PersistVolumePrefs();
+        PersistThemePrefs();
         PersistResume();
         _positionTimer.Stop();
         _autoHideTimer.Stop();
