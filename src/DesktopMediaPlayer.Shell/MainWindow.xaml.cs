@@ -927,6 +927,16 @@ public partial class MainWindow : Window, IPlaybackObserver
                 Stop_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.MediaNextTrack:
+                // S27 Soft: hardware MediaNextTrack → existing PlayNext Soft (no wrap).
+                Next_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.MediaPreviousTrack:
+                // S27 Soft: hardware MediaPreviousTrack → existing PlayPrevious Soft (no wrap).
+                Prev_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Playlist_Click(sender, e);
                 e.Handled = true;
