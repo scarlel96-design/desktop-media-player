@@ -638,6 +638,29 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.Seek(target);
     }
 
+    /// <summary>S23 Soft: Home → Seek(0) via existing Facade Seek.</summary>
+    private void SoftSeekHome()
+    {
+        _facade?.Seek(0);
+    }
+
+    /// <summary>S23 Soft: End → Seek(duration); duration≤0 Soft no-op.</summary>
+    private void SoftSeekEnd()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var duration = _facade.GetDuration();
+        if (duration <= 0)
+        {
+            return;
+        }
+
+        _facade.Seek(duration);
+    }
+
     private void PollPosition()
     {
         if (_facade is null)
@@ -779,6 +802,14 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.PageDown:
                 SoftSeekBySeconds(-60);
+                e.Handled = true;
+                break;
+            case Key.Home:
+                SoftSeekHome();
+                e.Handled = true;
+                break;
+            case Key.End:
+                SoftSeekEnd();
                 e.Handled = true;
                 break;
             case Key.Up:
