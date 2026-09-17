@@ -110,6 +110,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.AddObserver(this);
         RefreshTransportEnabled();
         ApplyPersistedVolumePrefs();
+        ApplyPersistedPlaylistPrefs();
         RefreshThemeButton();
 
         TryAttachRenderHost();
@@ -273,6 +274,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -314,6 +316,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -325,6 +328,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -964,6 +968,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -1127,6 +1132,48 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         var volume = (int)Math.Round(Math.Clamp(VolumeSlider.Value, 0, 100));
         VolumePrefsStore.Persist(volume, _muteUi);
+    }
+
+    // --- S20 Playlist prefs Soft ---
+
+    private void ApplyPersistedPlaylistPrefs()
+    {
+        if (_playlist is null)
+        {
+            return;
+        }
+
+        if (!PlaylistPrefsStore.TryLoad(out var paths, out _))
+        {
+            return;
+        }
+
+        _playlist.Clear();
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            {
+                // Soft skip missing / blank paths — no auto Open/Play.
+                continue;
+            }
+
+            _playlist.Add(path);
+        }
+
+        // Soft: restore list only (Architecture). Do not PlayAt/Open.
+        RefreshPlaylistUi();
+        RefreshTransportEnabled();
+    }
+
+    private void PersistPlaylistPrefs()
+    {
+        if (_playlist is null)
+        {
+            PlaylistPrefsStore.Persist(Array.Empty<string>(), -1);
+            return;
+        }
+
+        PlaylistPrefsStore.Persist(_playlist.Items, _playlist.CurrentIndex);
     }
 
     private void PersistResume()
@@ -1330,6 +1377,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         WindowBoundsStore.Persist(this);
         PersistVolumePrefs();
         PersistThemePrefs();
+        PersistPlaylistPrefs();
         PersistResume();
         _positionTimer.Stop();
         _autoHideTimer.Stop();
