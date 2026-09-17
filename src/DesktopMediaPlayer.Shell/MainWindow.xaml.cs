@@ -806,6 +806,8 @@ public partial class MainWindow : Window, IPlaybackObserver
         switch (e.Key)
         {
             case Key.Space:
+            case Key.MediaPlayPause:
+                // S26 Soft: hardware MediaPlayPause → existing Play/Pause toggle Soft.
                 if (_facade.GetState() == PlaybackState.Playing)
                 {
                     Pause_Click(sender, e);
@@ -917,6 +919,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 e.Handled = true;
                 break;
             case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                Stop_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.MediaStop:
+                // S26 Soft: hardware MediaStop → existing Stop Soft.
                 Stop_Click(sender, e);
                 e.Handled = true;
                 break;
