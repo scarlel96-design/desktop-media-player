@@ -661,6 +661,24 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.Seek(duration);
     }
 
+    /// <summary>S24 Soft: D0–D9 / NumPad → Seek(duration * n / 10); duration≤0 Soft no-op.</summary>
+    private void SoftSeekFraction(int tenth)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var duration = _facade.GetDuration();
+        if (duration <= 0)
+        {
+            return;
+        }
+
+        var n = Math.Clamp(tenth, 0, 9);
+        _facade.Seek(duration * n / 10.0);
+    }
+
     private void PollPosition()
     {
         if (_facade is null)
@@ -810,6 +828,56 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.End:
                 SoftSeekEnd();
+                e.Handled = true;
+                break;
+            case Key.D0:
+            case Key.NumPad0:
+                SoftSeekFraction(0);
+                e.Handled = true;
+                break;
+            case Key.D1:
+            case Key.NumPad1:
+                SoftSeekFraction(1);
+                e.Handled = true;
+                break;
+            case Key.D2:
+            case Key.NumPad2:
+                SoftSeekFraction(2);
+                e.Handled = true;
+                break;
+            case Key.D3:
+            case Key.NumPad3:
+                SoftSeekFraction(3);
+                e.Handled = true;
+                break;
+            case Key.D4:
+            case Key.NumPad4:
+                SoftSeekFraction(4);
+                e.Handled = true;
+                break;
+            case Key.D5:
+            case Key.NumPad5:
+                SoftSeekFraction(5);
+                e.Handled = true;
+                break;
+            case Key.D6:
+            case Key.NumPad6:
+                SoftSeekFraction(6);
+                e.Handled = true;
+                break;
+            case Key.D7:
+            case Key.NumPad7:
+                SoftSeekFraction(7);
+                e.Handled = true;
+                break;
+            case Key.D8:
+            case Key.NumPad8:
+                SoftSeekFraction(8);
+                e.Handled = true;
+                break;
+            case Key.D9:
+            case Key.NumPad9:
+                SoftSeekFraction(9);
                 e.Handled = true;
                 break;
             case Key.Up:
