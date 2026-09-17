@@ -90,8 +90,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             }
         };
         DpiChanged += (_, _) => ResizeRenderHost();
-        SeekSlider.PreviewMouseLeftButtonDown += (_, _) => _seekDragging = true;
-        SeekSlider.PreviewMouseLeftButtonUp += (_, _) => _seekDragging = false;
+        // KI-024 Soft: PreviewMouse handlers live in XAML (Down/Up/LostCapture) — no racing Up lambda.
         ApplyTheme(_theme);
     }
 
@@ -499,16 +498,32 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    // KI-024 Soft: unify PreviewMouse drag/commit; keep _seekDragging until after Facade Seek
+    // so ApplyTimeline/OnPositionChanged cannot overwrite the thumb mid-drag.
+    private void SeekSlider_DragStarted(object sender, MouseButtonEventArgs e)
+    {
+        _seekDragging = true;
+    }
+
     private void SeekSlider_Committed(object sender, MouseButtonEventArgs e)
     {
-        _seekDragging = false;
-        CommitSeek();
+        EndSeekDrag();
     }
 
     private void SeekSlider_LostCapture(object sender, MouseEventArgs e)
     {
-        _seekDragging = false;
+        EndSeekDrag();
+    }
+
+    private void EndSeekDrag()
+    {
+        if (!_seekDragging)
+        {
+            return;
+        }
+
         CommitSeek();
+        _seekDragging = false;
     }
 
 
@@ -618,6 +633,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         UpdateTimeLabels(positionSeconds, _durationSeconds);
         UpdateBufferBar(positionSeconds);
 
+        // KI-024 Soft: never write SeekSlider.Value while user is dragging/committing.
         if (_seekDragging)
         {
             return;
