@@ -937,6 +937,16 @@ public partial class MainWindow : Window, IPlaybackObserver
                 Prev_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.VolumeUp:
+                // S28 Soft: hardware VolumeUp → existing AdjustVolumeBySteps(+5) Soft.
+                AdjustVolumeBySteps(5);
+                e.Handled = true;
+                break;
+            case Key.VolumeDown:
+                // S28 Soft: hardware VolumeDown → existing AdjustVolumeBySteps(-5) Soft.
+                AdjustVolumeBySteps(-5);
+                e.Handled = true;
+                break;
             case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Playlist_Click(sender, e);
                 e.Handled = true;
