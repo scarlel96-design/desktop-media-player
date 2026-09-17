@@ -615,6 +615,29 @@ public partial class MainWindow : Window, IPlaybackObserver
         PersistResume();
     }
 
+    /// <summary>S22 Soft: PageUp/PageDown ±60s via existing Facade Seek, duration-clamped Soft.</summary>
+    private void SoftSeekBySeconds(double deltaSeconds)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var position = _facade.GetPosition();
+        var duration = _facade.GetDuration();
+        var target = position + deltaSeconds;
+        if (duration > 0)
+        {
+            target = Math.Clamp(target, 0, duration);
+        }
+        else
+        {
+            target = Math.Max(0, target);
+        }
+
+        _facade.Seek(target);
+    }
+
     private void PollPosition()
     {
         if (_facade is null)
@@ -748,6 +771,14 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.Right:
                 _facade.Seek(_facade.GetPosition() + 5);
+                e.Handled = true;
+                break;
+            case Key.PageUp:
+                SoftSeekBySeconds(60);
+                e.Handled = true;
+                break;
+            case Key.PageDown:
+                SoftSeekBySeconds(-60);
                 e.Handled = true;
                 break;
             case Key.Up:
