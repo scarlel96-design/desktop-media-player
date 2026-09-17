@@ -404,6 +404,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         RefreshMuteGlyph();
         PersistVolumePrefs();
+        ShowMuteOsd();
     }
 
     private void VolumeGroup_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -474,6 +475,16 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void ShowVolumeOsd()
     {
         SubtitleOsdText.Text = $"Volume {(int)Math.Round(VolumeSlider.Value)}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S25 Soft: Mute On/Off Opacity OSD (same Soft path as ShowVolumeOsd).</summary>
+    private void ShowMuteOsd()
+    {
+        SubtitleOsdText.Text = _muteUi ? "Mute On" : "Mute Off";
         SubtitleOsdText.Opacity = 1;
         _osdShownUtc = DateTime.UtcNow;
         _osdFadeTimer.Stop();
