@@ -947,6 +947,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 AdjustVolumeBySteps(-5);
                 e.Handled = true;
                 break;
+            case Key.VolumeMute:
+                // S29 Soft: hardware VolumeMute → existing Mute toggle Soft (SetMute/ShowMuteOsd).
+                Mute_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Playlist_Click(sender, e);
                 e.Handled = true;
