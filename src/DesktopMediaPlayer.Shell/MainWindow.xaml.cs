@@ -491,6 +491,42 @@ public partial class MainWindow : Window, IPlaybackObserver
         _osdFadeTimer.Start();
     }
 
+    /// <summary>S30 Soft: copy current media path to Clipboard; missing path Soft no-op.</summary>
+    private void SoftCopyCurrentPath()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(path);
+            SubtitleOsdText.Text = "Path copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
     private void RefreshMuteGlyph()
     {
         var muted = _muteUi || VolumeSlider.Value <= 0;
@@ -916,6 +952,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.O when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Open_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.C when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S30 Soft: Ctrl+Shift+C → current media path Clipboard Soft.
+                SoftCopyCurrentPath();
                 e.Handled = true;
                 break;
             case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
