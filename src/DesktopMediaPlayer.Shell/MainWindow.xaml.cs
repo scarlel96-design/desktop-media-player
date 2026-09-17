@@ -977,17 +977,46 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         if (_playlist is null)
         {
+            if (PlaylistClearButton is not null)
+            {
+                PlaylistClearButton.IsEnabled = false;
+            }
+
             return;
         }
 
         PlaylistList.Items.Clear();
         var items = _playlist.Items;
         PlaylistEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (PlaylistClearButton is not null)
+        {
+            // S21 Soft: Clear disabled when empty.
+            PlaylistClearButton.IsEnabled = items.Count > 0;
+        }
+
         for (var i = 0; i < items.Count; i++)
         {
             var marker = i == _playlist.CurrentIndex ? "▶ " : "  ";
             PlaylistList.Items.Add($"{marker}{System.IO.Path.GetFileName(items[i])}");
         }
+    }
+
+    // --- S21 Soft Playlist Clear ---
+
+    private void PlaylistClear_Click(object sender, RoutedEventArgs e)
+    {
+        if (_playlist is null || _playlist.Items.Count == 0)
+        {
+            return;
+        }
+
+        PersistResume();
+        _playlist.Clear();
+        PlaylistList.SelectedIndex = -1;
+        RefreshPlaylistUi();
+        RefreshTransportEnabled();
+        PersistPlaylistPrefs();
+        ArmAutoHide();
     }
 
     // --- S6 theme / auto-hide / resume ---

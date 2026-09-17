@@ -227,7 +227,11 @@
                    Text="No items — Open a file to start."
                    Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"
                    Visibility="Visible"/>
-        <Button DockPanel.Dock="Bottom" Content="Open…" Margin="0,8,0,0" Click="Open_Click"/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+          <Button Content="Open…" Margin="0,0,8,0" Click="Open_Click"/>
+          <Button x:Name="PlaylistClearButton" Content="Clear" Click="PlaylistClear_Click" IsEnabled="False"
+                  ToolTip="Clear playlist (Soft)"/>
+        </StackPanel>
         <ListBox x:Name="PlaylistList"
                  Background="Transparent" BorderThickness="0" Foreground="#F0F0F0"
                  MouseDoubleClick="PlaylistList_MouseDoubleClick"/>
