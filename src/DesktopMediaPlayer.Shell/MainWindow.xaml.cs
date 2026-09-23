@@ -27,6 +27,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private double _durationSeconds;
     private int _lastAudibleVolume = 80;
     private bool _muteUi;
+    private bool _chromePinned;
     private MediaTrackKind? _flyoutKind;
     private bool _suppressTrackSelection;
     private WindowState _windowStateBeforeFullscreen = WindowState.Normal;
@@ -527,6 +528,28 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S35 Soft: toggle chrome pin Soft (no persist).</summary>
+    private void SoftToggleChromePin()
+    {
+        _chromePinned = !_chromePinned;
+        if (_chromePinned)
+        {
+            ShowChrome();
+            _autoHideTimer.Stop();
+            SubtitleOsdText.Text = "Chrome pinned";
+        }
+        else
+        {
+            ArmAutoHide();
+            SubtitleOsdText.Text = "Chrome unpinned";
+        }
+
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     private void RefreshMuteGlyph()
     {
         var muted = _muteUi || VolumeSlider.Value <= 0;
@@ -990,6 +1013,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 SoftCopyCurrentPath();
                 e.Handled = true;
                 break;
+            case Key.H when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S35 Soft: Ctrl+Shift+H → Soft Pin Chrome toggle (no persist).
+                SoftToggleChromePin();
+                e.Handled = true;
+                break;
             case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Stop_Click(sender, e);
                 e.Handled = true;
@@ -1388,7 +1416,8 @@ public partial class MainWindow : Window, IPlaybackObserver
     }
 
     private bool ShouldPauseAutoHide() =>
-        TrackFlyout.Visibility == Visibility.Visible
+        _chromePinned
+        || TrackFlyout.Visibility == Visibility.Visible
         || PlaylistPanel.Visibility == Visibility.Visible
         || MediaInfoFlyout.Visibility == Visibility.Visible
         || ErrorText.Visibility == Visibility.Visible;
