@@ -592,6 +592,44 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S42 Soft: cycle audio tracks Soft via ListTracks+SelectTrack Soft wrap; no flyout Soft open.</summary>
+    private void SoftCycleAudioTrack()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var tracks = _facade.ListTracks()
+            .Where(t => t.Kind == MediaTrackKind.Audio)
+            .ToList();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIdx = -1;
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (tracks[i].IsSelected)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        var nextIdx = selectedIdx < 0 ? 0 : (selectedIdx + 1) % tracks.Count;
+        var next = tracks[nextIdx];
+        _facade.SelectTrack(MediaTrackKind.Audio, next.Id);
+
+        var label = next.Title ?? next.Language ?? ("#" + next.Id);
+        SubtitleOsdText.Text = "Audio " + label;
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     /// <summary>S35 Soft: toggle chrome pin Soft (no persist).</summary>
     private void SoftToggleChromePin()
     {
@@ -1057,6 +1095,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.M:
                 Mute_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.A:
+                // S42 Soft: cycle audio tracks Soft (wrap Soft); flyout Soft not opened.
+                SoftCycleAudioTrack();
                 e.Handled = true;
                 break;
             case Key.F:
