@@ -860,6 +860,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 SoftSeekBySeconds(-10);
                 e.Handled = true;
                 break;
+            case Key.Left when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                // S34 Soft: Ctrl+Left → existing PlayPrevious Soft (no wrap).
+                Prev_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.Left:
                 _facade.Seek(Math.Max(0, _facade.GetPosition() - 5));
                 e.Handled = true;
@@ -867,6 +872,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.Right when (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift:
                 // S33 Soft: Shift+Right → Seek(pos+10) Soft, duration-clamped.
                 SoftSeekBySeconds(10);
+                e.Handled = true;
+                break;
+            case Key.Right when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                // S34 Soft: Ctrl+Right → existing PlayNext Soft (no wrap).
+                Next_Click(sender, e);
                 e.Handled = true;
                 break;
             case Key.Right:
