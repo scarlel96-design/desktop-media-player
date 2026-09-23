@@ -119,6 +119,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         UpdateTimeLabels(0, 0);
         ShowChrome();
         ApplyPersistedChromePinPrefs();
+        ApplyPersistedTopmostPrefs();
 
         if (!_facade.TryProbe(out var detail))
         {
@@ -462,6 +463,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void ToggleAlwaysOnTop()
     {
         Topmost = !Topmost;
+        PersistTopmostPrefs();
         ShowTopmostOsd();
     }
 
@@ -1469,6 +1471,20 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void PersistChromePinPrefs() => ChromePinPrefsStore.Persist(_chromePinned);
 
+    // --- S38 Topmost prefs Soft ---
+
+    private void ApplyPersistedTopmostPrefs()
+    {
+        if (!TopmostPrefsStore.TryLoad(out var topmost))
+        {
+            return;
+        }
+
+        Topmost = topmost;
+    }
+
+    private void PersistTopmostPrefs() => TopmostPrefsStore.Persist(Topmost);
+
     // --- S18 Volume prefs Soft ---
 
     private void ApplyPersistedVolumePrefs()
@@ -1742,6 +1758,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         PersistVolumePrefs();
         PersistThemePrefs();
         PersistChromePinPrefs();
+        PersistTopmostPrefs();
         PersistPlaylistPrefs();
         PersistResume();
         _positionTimer.Stop();
