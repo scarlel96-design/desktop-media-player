@@ -693,6 +693,26 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S50 Soft: copy playback position Soft FormatTime to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyTimestamp()
+    {
+        if (_facade is null) return;
+        double pos;
+        try { pos = _facade.GetPosition(); }
+        catch { return; }
+        if (double.IsNaN(pos) || pos < 0) return;
+        var text = FormatTime(pos, durationKnown: true); // existing Shell FormatTime Soft; 0 → "00:00"
+        if (string.IsNullOrWhiteSpace(text) || text == "--:--") return;
+        try {
+          Clipboard.SetText(text);
+          SubtitleOsdText.Text = "Time copied";
+          SubtitleOsdText.Opacity = 1;
+          _osdShownUtc = DateTime.UtcNow;
+          _osdFadeTimer.Stop();
+          _osdFadeTimer.Start();
+        } catch { /* Soft ignore clipboard Soft */ }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1411,6 +1431,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.VolumeMute:
                 // S29 Soft: hardware VolumeMute → existing Mute toggle Soft (SetMute/ShowMuteOsd).
                 Mute_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.P when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S50 Soft: Ctrl+Shift+P → playback timestamp Clipboard Soft.
+                SoftCopyTimestamp();
                 e.Handled = true;
                 break;
             case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
