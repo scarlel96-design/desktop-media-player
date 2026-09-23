@@ -552,6 +552,48 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S47 Soft: copy current media filename Soft to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyCurrentFilename()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var name = Path.GetFileName(path);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(name);
+            SubtitleOsdText.Text = "Filename copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1211,6 +1253,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.C when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
                 // S30 Soft: Ctrl+Shift+C → current media path Clipboard Soft.
                 SoftCopyCurrentPath();
+                e.Handled = true;
+                break;
+            case Key.N when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S47 Soft: Ctrl+Shift+N → current media filename Clipboard Soft.
+                SoftCopyCurrentFilename();
                 e.Handled = true;
                 break;
             case Key.H when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
