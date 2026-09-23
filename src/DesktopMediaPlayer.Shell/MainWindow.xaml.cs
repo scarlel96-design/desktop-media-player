@@ -1088,6 +1088,31 @@ public partial class MainWindow : Window, IPlaybackObserver
         ArmAutoHide();
     }
 
+    /// <summary>S31 Soft: close TrackFlyout / MediaInfoFlyout if visible. Returns true if any dismissed.</summary>
+    private bool SoftTryDismissFlyouts()
+    {
+        var dismissed = false;
+        if (TrackFlyout.Visibility == Visibility.Visible)
+        {
+            TrackFlyout.Visibility = Visibility.Collapsed;
+            _flyoutKind = null;
+            dismissed = true;
+        }
+
+        if (MediaInfoFlyout.Visibility == Visibility.Visible)
+        {
+            MediaInfoFlyout.Visibility = Visibility.Collapsed;
+            dismissed = true;
+        }
+
+        if (dismissed)
+        {
+            ArmAutoHide();
+        }
+
+        return dismissed;
+    }
+
     private void ToggleTrackFlyout(MediaTrackKind kind, string title)
     {
         if (_flyoutKind == kind && TrackFlyout.Visibility == Visibility.Visible)
