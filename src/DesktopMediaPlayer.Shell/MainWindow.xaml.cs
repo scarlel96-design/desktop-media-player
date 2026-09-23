@@ -1952,8 +1952,28 @@ public partial class MainWindow : Window, IPlaybackObserver
             Filter = "PNG image|*.png|JPEG image|*.jpg",
             FileName = $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.png"
         };
+
+        // S46 Soft: reuse LastOpenDirectoryPrefsStore Soft (same prefs Soft as Open/Sub Soft).
+        if (LastOpenDirectoryPrefsStore.TryLoad(out var lastDir) && Directory.Exists(lastDir))
+        {
+            dlg.InitialDirectory = lastDir;
+        }
+
         if (dlg.ShowDialog(this) == true)
         {
+            try
+            {
+                var dir = Path.GetDirectoryName(dlg.FileName);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    LastOpenDirectoryPrefsStore.Persist(dir);
+                }
+            }
+            catch
+            {
+                // Soft ignore path/IO failures.
+            }
+
             _facade.Screenshot(dlg.FileName);
             StatusText.Text = $"Screenshot → {dlg.FileName}";
         }
