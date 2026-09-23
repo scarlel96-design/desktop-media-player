@@ -668,6 +668,44 @@ public partial class MainWindow : Window, IPlaybackObserver
         _osdFadeTimer.Start();
     }
 
+    /// <summary>S44 Soft: cycle video tracks Soft via ListTracks+SelectTrack Soft wrap; no flyout Soft open.</summary>
+    private void SoftCycleVideoTrack()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var tracks = _facade.ListTracks()
+            .Where(t => t.Kind == MediaTrackKind.Video)
+            .ToList();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIdx = -1;
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (tracks[i].IsSelected)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        var nextIdx = selectedIdx < 0 ? 0 : (selectedIdx + 1) % tracks.Count;
+        var next = tracks[nextIdx];
+        _facade.SelectTrack(MediaTrackKind.Video, next.Id);
+
+        var label = next.Title ?? next.Language ?? ("#" + next.Id);
+        SubtitleOsdText.Text = "Video " + label;
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     /// <summary>S35 Soft: toggle chrome pin Soft (no persist).</summary>
     private void SoftToggleChromePin()
     {
@@ -1138,6 +1176,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.A:
                 // S42 Soft: cycle audio tracks Soft (wrap Soft); flyout Soft not opened.
                 SoftCycleAudioTrack();
+                e.Handled = true;
+                break;
+            case Key.V:
+                // S44 Soft: cycle video tracks Soft (wrap Soft); flyout Soft not opened.
+                SoftCycleVideoTrack();
                 e.Handled = true;
                 break;
             case Key.F:
