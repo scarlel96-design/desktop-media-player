@@ -121,6 +121,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         ShowChrome();
         ApplyPersistedChromePinPrefs();
         ApplyPersistedTopmostPrefs();
+        ApplyPersistedPlaylistPanelPrefs();
 
         if (!_facade.TryProbe(out var detail))
         {
@@ -1367,6 +1368,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             PlaylistPanel.Visibility = Visibility.Collapsed;
             SideColumn.Width = new GridLength(0);
+            PersistPlaylistPanelPrefs();
             dismissed = true;
         }
 
@@ -1394,6 +1396,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         TrackFlyout.Visibility = Visibility.Visible;
         PlaylistPanel.Visibility = Visibility.Collapsed;
         SideColumn.Width = new GridLength(0);
+        PersistPlaylistPanelPrefs();
         ShowChrome();
         _autoHideTimer.Stop();
     }
@@ -1489,6 +1492,9 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             ArmAutoHide();
         }
+
+        // S45 Soft: persist PlaylistPanel Visibility Soft (+ SideColumn Width Soft pair).
+        PersistPlaylistPanelPrefs();
     }
 
     private void PlaylistList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1685,6 +1691,25 @@ public partial class MainWindow : Window, IPlaybackObserver
     }
 
     private void PersistChromePinPrefs() => ChromePinPrefsStore.Persist(_chromePinned);
+
+    // --- S45 Playlist panel prefs Soft ---
+
+    private void ApplyPersistedPlaylistPanelPrefs()
+    {
+        if (!PlaylistPanelPrefsStore.TryLoad(out var open) || !open)
+        {
+            return;
+        }
+
+        PlaylistPanel.Visibility = Visibility.Visible;
+        SideColumn.Width = new GridLength(300);
+        RefreshPlaylistUi();
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void PersistPlaylistPanelPrefs() =>
+        PlaylistPanelPrefsStore.Persist(PlaylistPanel.Visibility == Visibility.Visible);
 
     // --- S38 Topmost prefs Soft ---
 
@@ -1973,6 +1998,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         PersistVolumePrefs();
         PersistThemePrefs();
         PersistChromePinPrefs();
+        PersistPlaylistPanelPrefs();
         PersistTopmostPrefs();
         PersistPlaylistPrefs();
         PersistResume();
