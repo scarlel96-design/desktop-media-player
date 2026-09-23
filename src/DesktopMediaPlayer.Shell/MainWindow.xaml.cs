@@ -183,9 +183,28 @@ public partial class MainWindow : Window, IPlaybackObserver
             Multiselect = true
         };
 
+        // S40 Soft: OpenFileDialog InitialDirectory from LocalAppData Soft prefs.
+        if (LastOpenDirectoryPrefsStore.TryLoad(out var lastDir) && Directory.Exists(lastDir))
+        {
+            dlg.InitialDirectory = lastDir;
+        }
+
         if (dlg.ShowDialog(this) != true || dlg.FileNames.Length == 0)
         {
             return;
+        }
+
+        try
+        {
+            var dir = Path.GetDirectoryName(dlg.FileNames[0]);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                LastOpenDirectoryPrefsStore.Persist(dir);
+            }
+        }
+        catch
+        {
+            // Soft ignore path/IO failures.
         }
 
         OpenMediaFiles(dlg.FileNames);
