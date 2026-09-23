@@ -558,7 +558,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             Process.Start(new ProcessStartInfo
             {
                 FileName = "explorer.exe",
-                Arguments = "/select,"" + path + """,
+                Arguments = "/select," + '"' + path + '"',
                 UseShellExecute = true
             });
             SubtitleOsdText.Text = "Shown in folder";
