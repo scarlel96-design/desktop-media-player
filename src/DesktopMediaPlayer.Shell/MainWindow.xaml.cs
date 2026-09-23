@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -531,6 +532,47 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
+    private void SoftShowInFolder()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = "/select,"" + path + """,
+                UseShellExecute = true
+            });
+            SubtitleOsdText.Text = "Shown in folder";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore explorer launch failures.
+        }
+    }
+
     /// <summary>S35 Soft: toggle chrome pin Soft (no persist).</summary>
     private void SoftToggleChromePin()
     {
@@ -1030,6 +1072,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.H when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
                 // S35 Soft: Ctrl+Shift+H → Soft Pin Chrome toggle (no persist).
                 SoftToggleChromePin();
+                e.Handled = true;
+                break;
+            case Key.E when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S39 Soft: Ctrl+Shift+E → Explorer /select current media Soft.
+                SoftShowInFolder();
                 e.Handled = true;
                 break;
             case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
