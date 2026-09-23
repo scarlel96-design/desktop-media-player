@@ -594,6 +594,48 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S48 Soft: copy current media directory path Soft to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyDirectoryPath()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var dir = Path.GetDirectoryName(path);
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(dir);
+            SubtitleOsdText.Text = "Folder copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1258,6 +1300,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.N when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
                 // S47 Soft: Ctrl+Shift+N → current media filename Clipboard Soft.
                 SoftCopyCurrentFilename();
+                e.Handled = true;
+                break;
+            case Key.D when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S48 Soft: Ctrl+Shift+D → current media directory path Clipboard Soft.
+                SoftCopyDirectoryPath();
                 e.Handled = true;
                 break;
             case Key.H when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
