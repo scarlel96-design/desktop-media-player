@@ -118,6 +118,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         ResizeRenderHost();
         UpdateTimeLabels(0, 0);
         ShowChrome();
+        ApplyPersistedChromePinPrefs();
 
         if (!_facade.TryProbe(out var detail))
         {
@@ -544,6 +545,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             SubtitleOsdText.Text = "Chrome unpinned";
         }
 
+        PersistChromePinPrefs();
         SubtitleOsdText.Opacity = 1;
         _osdShownUtc = DateTime.UtcNow;
         _osdFadeTimer.Stop();
@@ -1441,6 +1443,22 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void PersistThemePrefs() => ThemePrefsStore.Persist(_theme);
 
+    // --- S36 Chrome pin prefs Soft ---
+
+    private void ApplyPersistedChromePinPrefs()
+    {
+        if (!ChromePinPrefsStore.TryLoad(out var pinned) || !pinned)
+        {
+            return;
+        }
+
+        _chromePinned = true;
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void PersistChromePinPrefs() => ChromePinPrefsStore.Persist(_chromePinned);
+
     // --- S18 Volume prefs Soft ---
 
     private void ApplyPersistedVolumePrefs()
@@ -1713,6 +1731,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         WindowBoundsStore.Persist(this);
         PersistVolumePrefs();
         PersistThemePrefs();
+        PersistChromePinPrefs();
         PersistPlaylistPrefs();
         PersistResume();
         _positionTimer.Stop();
