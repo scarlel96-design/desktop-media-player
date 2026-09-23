@@ -630,6 +630,44 @@ public partial class MainWindow : Window, IPlaybackObserver
         _osdFadeTimer.Start();
     }
 
+    /// <summary>S43 Soft: cycle subtitle tracks Soft via ListTracks+SelectTrack Soft wrap; no flyout Soft open.</summary>
+    private void SoftCycleSubtitleTrack()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var tracks = _facade.ListTracks()
+            .Where(t => t.Kind == MediaTrackKind.Subtitle)
+            .ToList();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIdx = -1;
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (tracks[i].IsSelected)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        var nextIdx = selectedIdx < 0 ? 0 : (selectedIdx + 1) % tracks.Count;
+        var next = tracks[nextIdx];
+        _facade.SelectTrack(MediaTrackKind.Subtitle, next.Id);
+
+        var label = next.Title ?? next.Language ?? ("#" + next.Id);
+        SubtitleOsdText.Text = "Subtitle " + label;
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     /// <summary>S35 Soft: toggle chrome pin Soft (no persist).</summary>
     private void SoftToggleChromePin()
     {
@@ -1143,6 +1181,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Stop_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.S:
+                // S43 Soft: bare S → cycle subtitle tracks Soft (wrap Soft); Ctrl+S Stop Soft unchanged.
+                SoftCycleSubtitleTrack();
                 e.Handled = true;
                 break;
             case Key.MediaStop:
