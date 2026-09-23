@@ -636,6 +636,63 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    /// <summary>S49 Soft: copy media title Soft to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyMediaTitle()
+    {
+        string? title = null;
+        try
+        {
+            if (_facade is not null)
+            {
+                title = _facade.GetMediaInfo().Title;
+            }
+        }
+        catch
+        {
+            // Soft ignore GetMediaInfo failures.
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            string? path = null;
+            if (_playlist is not null
+                && _playlist.CurrentIndex >= 0
+                && _playlist.CurrentIndex < _playlist.Items.Count)
+            {
+                path = _playlist.Items[_playlist.CurrentIndex];
+            }
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path = _currentPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                title = Path.GetFileNameWithoutExtension(path);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(title);
+            SubtitleOsdText.Text = "Title copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1358,6 +1415,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Playlist_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.T when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S49 Soft: Ctrl+Shift+T → media title Clipboard Soft.
+                SoftCopyMediaTitle();
                 e.Handled = true;
                 break;
             case Key.T when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
