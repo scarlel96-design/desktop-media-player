@@ -880,6 +880,11 @@ public partial class MainWindow : Window, IPlaybackObserver
 
                 e.Handled = true;
                 break;
+            case Key.Left when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S37 Soft: Ctrl+Shift+Left → Seek(pos-30) Soft, duration-clamped.
+                SoftSeekBySeconds(-30);
+                e.Handled = true;
+                break;
             case Key.Left when (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift:
                 // S33 Soft: Shift+Left → Seek(pos-10) Soft, duration-clamped.
                 SoftSeekBySeconds(-10);
@@ -892,6 +897,11 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.Left:
                 _facade.Seek(Math.Max(0, _facade.GetPosition() - 5));
+                e.Handled = true;
+                break;
+            case Key.Right when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S37 Soft: Ctrl+Shift+Right → Seek(pos+30) Soft, duration-clamped.
+                SoftSeekBySeconds(30);
                 e.Handled = true;
                 break;
             case Key.Right when (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift:
