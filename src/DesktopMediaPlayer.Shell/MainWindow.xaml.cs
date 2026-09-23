@@ -946,9 +946,20 @@ public partial class MainWindow : Window, IPlaybackObserver
                 ToggleFullscreen();
                 e.Handled = true;
                 break;
-            case Key.Escape when WindowStyle == WindowStyle.None:
-                ToggleFullscreen();
-                e.Handled = true;
+            case Key.Escape:
+                // S31 Soft: dismiss Track/MediaInfo flyouts first; fullscreen Exit Soft only if none open.
+                if (SoftTryDismissFlyouts())
+                {
+                    e.Handled = true;
+                    break;
+                }
+
+                if (WindowStyle == WindowStyle.None)
+                {
+                    ToggleFullscreen();
+                    e.Handled = true;
+                }
+
                 break;
             case Key.O when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Open_Click(sender, e);
