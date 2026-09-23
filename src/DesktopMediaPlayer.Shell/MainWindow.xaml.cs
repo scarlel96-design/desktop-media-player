@@ -1316,8 +1316,28 @@ public partial class MainWindow : Window, IPlaybackObserver
             Title = "Load external subtitle",
             Filter = "Subtitles|*.srt;*.ass;*.ssa;*.vtt;*.sub|All files|*.*"
         };
+
+        // S41 Soft: reuse LastOpenDirectoryPrefsStore Soft (same prefs as Open media Soft).
+        if (LastOpenDirectoryPrefsStore.TryLoad(out var lastDir) && Directory.Exists(lastDir))
+        {
+            dlg.InitialDirectory = lastDir;
+        }
+
         if (dlg.ShowDialog(this) == true)
         {
+            try
+            {
+                var dir = Path.GetDirectoryName(dlg.FileName);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    LastOpenDirectoryPrefsStore.Persist(dir);
+                }
+            }
+            catch
+            {
+                // Soft ignore path/IO failures.
+            }
+
             _facade.LoadExternalSubtitle(dlg.FileName);
             PopulateTrackList(MediaTrackKind.Subtitle);
         }
