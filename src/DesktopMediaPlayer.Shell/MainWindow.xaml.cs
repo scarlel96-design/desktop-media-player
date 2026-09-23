@@ -1105,6 +1105,14 @@ public partial class MainWindow : Window, IPlaybackObserver
             dismissed = true;
         }
 
+        // S32 Soft: Escape also Soft-closes PlaylistPanel when open (before FS Exit Soft).
+        if (PlaylistPanel.Visibility == Visibility.Visible)
+        {
+            PlaylistPanel.Visibility = Visibility.Collapsed;
+            SideColumn.Width = new GridLength(0);
+            dismissed = true;
+        }
+
         if (dismissed)
         {
             ArmAutoHide();
