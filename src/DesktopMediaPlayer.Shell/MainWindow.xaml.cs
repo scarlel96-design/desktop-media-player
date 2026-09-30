@@ -1193,6 +1193,17 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         _facade.Seek(target);
+        ShowSeekOsd(target, duration);
+    }
+
+    /// <summary>S57 Soft: OSD "position / duration" after keyboard seek; display only.</summary>
+    private void ShowSeekOsd(double target, double duration)
+    {
+        SubtitleOsdText.Text = $"{FormatTime(target, true)} / {FormatTime(duration, duration > 0)}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
     }
 
     /// <summary>S23 Soft: Home → Seek(0) via existing Facade Seek.</summary>
