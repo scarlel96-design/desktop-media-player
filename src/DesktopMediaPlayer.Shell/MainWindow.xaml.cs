@@ -756,6 +756,26 @@ public partial class MainWindow : Window, IPlaybackObserver
         } catch { /* Soft ignore clipboard Soft */ }
     }
 
+    /// <summary>S53 Soft: Backspace → reset subtitle offset to 0 Soft via existing Facade SetSubtitleOffset + OSD; already 0 or no facade Soft no-op.</summary>
+    private void SoftResetSubtitleOffset()
+    {
+        try
+        {
+            if (_facade is null || _subtitleOffsetSeconds == 0)
+            {
+                return;
+            }
+
+            _subtitleOffsetSeconds = 0;
+            _facade.SetSubtitleOffset(0);
+            ShowSubtitleOffsetOsd();
+        }
+        catch
+        {
+            // Soft no-op.
+        }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1515,6 +1535,16 @@ public partial class MainWindow : Window, IPlaybackObserver
                 break;
             case Key.OemComma:
                 _facade.FrameStep(-1);
+                e.Handled = true;
+                break;
+            case Key.Back:
+                // S53 Soft: Backspace → reset subtitle offset Soft; text input Soft skip.
+                if (e.OriginalSource is System.Windows.Controls.TextBox)
+                {
+                    break;
+                }
+
+                SoftResetSubtitleOffset();
                 e.Handled = true;
                 break;
             case Key.OemOpenBrackets:
