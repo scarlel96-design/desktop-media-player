@@ -1386,6 +1386,16 @@ public partial class MainWindow : Window, IPlaybackObserver
                 SoftSeekFraction(9);
                 e.Handled = true;
                 break;
+            case Key.Up when Keyboard.Modifiers == ModifierKeys.Shift:
+                // S54 Soft: Shift+Up → fine volume +1 Soft via existing AdjustVolumeBySteps; Shift only Soft.
+                AdjustVolumeBySteps(1);
+                e.Handled = true;
+                break;
+            case Key.Down when Keyboard.Modifiers == ModifierKeys.Shift:
+                // S54 Soft: Shift+Down → fine volume -1 Soft via existing AdjustVolumeBySteps; Shift only Soft.
+                AdjustVolumeBySteps(-1);
+                e.Handled = true;
+                break;
             case Key.Up:
                 AdjustVolumeBySteps(5);
                 e.Handled = true;
