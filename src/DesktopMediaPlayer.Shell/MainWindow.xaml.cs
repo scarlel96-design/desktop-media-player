@@ -713,6 +713,26 @@ public partial class MainWindow : Window, IPlaybackObserver
         } catch { /* Soft ignore clipboard Soft */ }
     }
 
+    /// <summary>S51 Soft: copy media duration Soft FormatTime to Clipboard; unknown/invalid Soft no-op.</summary>
+    private void SoftCopyDuration()
+    {
+        if (_facade is null) return;
+        double dur;
+        try { dur = _facade.GetDuration(); }
+        catch { return; }
+        if (double.IsNaN(dur) || double.IsInfinity(dur) || dur <= 0) return;
+        var text = FormatTime(dur, durationKnown: true); // existing Shell FormatTime Soft
+        if (string.IsNullOrWhiteSpace(text) || text == "--:--") return;
+        try {
+          Clipboard.SetText(text);
+          SubtitleOsdText.Text = "Length copied";
+          SubtitleOsdText.Opacity = 1;
+          _osdShownUtc = DateTime.UtcNow;
+          _osdFadeTimer.Stop();
+          _osdFadeTimer.Start();
+        } catch { /* Soft ignore clipboard Soft */ }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1431,6 +1451,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.VolumeMute:
                 // S29 Soft: hardware VolumeMute → existing Mute toggle Soft (SetMute/ShowMuteOsd).
                 Mute_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.L when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S51 Soft: Ctrl+Shift+L → media duration Clipboard Soft.
+                SoftCopyDuration();
                 e.Handled = true;
                 break;
             case Key.P when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
