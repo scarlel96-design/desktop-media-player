@@ -2219,7 +2219,24 @@ public partial class MainWindow : Window, IPlaybackObserver
             RefreshPlaylistUi();
             ArmAutoHide();
             ApplyPendingResumeAtFirstFrame();
+            SoftUpdateWindowTitle();
         });
+    }
+
+    // S56 Soft: window title = "<file> - Desktop Media Player"; read-only on _currentPath, no-op on failure.
+    private void SoftUpdateWindowTitle()
+    {
+        try
+        {
+            var name = string.IsNullOrWhiteSpace(_currentPath) ? null : Path.GetFileName(_currentPath);
+            if (!string.IsNullOrEmpty(name))
+            {
+                Title = $"{name} - Desktop Media Player";
+            }
+        }
+        catch
+        {
+        }
     }
 
     public void OnStateChanged(PlaybackState state)
