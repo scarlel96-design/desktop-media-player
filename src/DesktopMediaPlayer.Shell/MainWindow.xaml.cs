@@ -733,6 +733,29 @@ public partial class MainWindow : Window, IPlaybackObserver
         } catch { /* Soft ignore clipboard Soft */ }
     }
 
+    /// <summary>S52 Soft: copy remaining time Soft (duration - position, min 0) FormatTime to Clipboard; invalid Soft no-op.</summary>
+    private void SoftCopyRemaining()
+    {
+        if (_facade is null) return;
+        double dur;
+        double pos;
+        try { dur = _facade.GetDuration(); pos = _facade.GetPosition(); }
+        catch { return; }
+        if (double.IsNaN(dur) || double.IsInfinity(dur) || dur <= 0) return;
+        if (double.IsNaN(pos) || pos < 0) return;
+        var remaining = Math.Max(0, dur - pos);
+        var text = FormatTime(remaining, durationKnown: true); // existing Shell FormatTime Soft
+        if (string.IsNullOrWhiteSpace(text) || text == "--:--") return;
+        try {
+          Clipboard.SetText(text);
+          SubtitleOsdText.Text = "Remaining copied";
+          SubtitleOsdText.Opacity = 1;
+          _osdShownUtc = DateTime.UtcNow;
+          _osdFadeTimer.Stop();
+          _osdFadeTimer.Start();
+        } catch { /* Soft ignore clipboard Soft */ }
+    }
+
     /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
     private void SoftShowInFolder()
     {
@@ -1451,6 +1474,11 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.VolumeMute:
                 // S29 Soft: hardware VolumeMute → existing Mute toggle Soft (SetMute/ShowMuteOsd).
                 Mute_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.R when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S52 Soft: Ctrl+Shift+R → remaining time Clipboard Soft.
+                SoftCopyRemaining();
                 e.Handled = true;
                 break;
             case Key.L when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
