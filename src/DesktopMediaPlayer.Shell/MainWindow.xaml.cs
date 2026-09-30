@@ -175,6 +175,12 @@ public partial class MainWindow : Window, IPlaybackObserver
         ".flac", ".mp3", ".m4a", ".aac", ".wav", ".ogg"
     };
 
+    // S55 Soft: same list as the Sub button dialog filter.
+    private static readonly HashSet<string> SubtitleExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".srt", ".ass", ".ssa", ".vtt", ".sub"
+    };
+
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
@@ -215,7 +221,10 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
-        e.Effects = HasDroppableMedia(e.Data) ? DragDropEffects.Copy : DragDropEffects.None;
+        // S55 Soft: subtitle-only drop also allowed when a subtitle can actually be loaded; same predicate as Drop.
+        e.Effects = HasDroppableMedia(e.Data) || CanDropSubtitle(e.Data)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -223,11 +232,85 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         if (!TryGetDroppedMediaPaths(e.Data, out var paths) || paths.Count == 0)
         {
+            // S55 Soft: no media in drop → first subtitle file only Soft (mixed drops keep OpenMediaFiles path).
+            if (CanDropSubtitle(e.Data) && TryGetDroppedSubtitlePath(e.Data, out var sub))
+            {
+                SoftLoadDroppedSubtitle(sub);
+                e.Handled = true;
+            }
+
             return;
         }
 
         OpenMediaFiles(paths);
         e.Handled = true;
+    }
+
+    /// <summary>S55 Soft: subtitle drop only when no media in drop, facade present and media loaded (not Idle/Opening/Stopped/Error).</summary>
+    private bool CanDropSubtitle(IDataObject data)
+    {
+        try
+        {
+            if (_facade is null || HasDroppableMedia(data))
+            {
+                return false;
+            }
+
+            var state = _facade.GetState();
+            if (state is PlaybackState.Idle or PlaybackState.Opening or PlaybackState.Stopped or PlaybackState.Error)
+            {
+                return false;
+            }
+
+            return TryGetDroppedSubtitlePath(data, out _);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryGetDroppedSubtitlePath(IDataObject data, out string path)
+    {
+        path = string.Empty;
+        if (data is null
+            || !data.GetDataPresent(DataFormats.FileDrop)
+            || data.GetData(DataFormats.FileDrop) is not string[] files)
+        {
+            return false;
+        }
+
+        foreach (var file in files)
+        {
+            if (!string.IsNullOrWhiteSpace(file)
+                && File.Exists(file)
+                && SubtitleExtensions.Contains(Path.GetExtension(file)))
+            {
+                path = file;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>S55 Soft: existing LoadExternalSubtitle + PopulateTrackList(Subtitle); no facade or exception Soft no-op.</summary>
+    private void SoftLoadDroppedSubtitle(string path)
+    {
+        try
+        {
+            if (_facade is null)
+            {
+                return;
+            }
+
+            _facade.LoadExternalSubtitle(path);
+            PopulateTrackList(MediaTrackKind.Subtitle);
+        }
+        catch
+        {
+            // Soft no-op.
+        }
     }
 
     private static bool HasDroppableMedia(IDataObject data) =>
