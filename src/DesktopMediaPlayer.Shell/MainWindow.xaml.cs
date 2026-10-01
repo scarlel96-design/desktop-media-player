@@ -1983,6 +1983,13 @@ public partial class MainWindow : Window, IPlaybackObserver
             var marker = i == _playlist.CurrentIndex ? "▶ " : "  ";
             PlaylistList.Items.Add($"{marker}{System.IO.Path.GetFileName(items[i])}");
         }
+
+        // S66 Soft: select + scroll to current item (out of range: no selection).
+        if (_playlist.CurrentIndex >= 0 && _playlist.CurrentIndex < items.Count)
+        {
+            PlaylistList.SelectedIndex = _playlist.CurrentIndex;
+            PlaylistList.ScrollIntoView(PlaylistList.SelectedItem);
+        }
     }
 
     // --- S21 Soft Playlist Clear ---
