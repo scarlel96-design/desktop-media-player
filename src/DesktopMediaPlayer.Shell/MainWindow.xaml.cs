@@ -1392,7 +1392,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                 e.Handled = true;
                 break;
             case Key.Left:
-                _facade.Seek(Math.Max(0, _facade.GetPosition() - 5));
+                SoftSeekBySeconds(-5);
                 e.Handled = true;
                 break;
             case Key.Right when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
@@ -1411,7 +1411,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                 e.Handled = true;
                 break;
             case Key.Right:
-                _facade.Seek(_facade.GetPosition() + 5);
+                SoftSeekBySeconds(5);
                 e.Handled = true;
                 break;
             case Key.PageUp:
