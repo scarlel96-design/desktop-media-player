@@ -423,6 +423,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        ShowPlaylistPositionOsd();
         PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
@@ -435,6 +436,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        ShowPlaylistPositionOsd();
         PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
@@ -1210,6 +1212,21 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void ShowPlayPauseOsd(bool paused)
     {
         SubtitleOsdText.Text = paused ? "Paused" : "Play";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S63 Soft: OSD "n / total" after previous/next track; display only.</summary>
+    private void ShowPlaylistPositionOsd()
+    {
+        if (_playlist is null || _playlist.CurrentIndex < 0 || _playlist.CurrentIndex >= _playlist.Items.Count)
+        {
+            return;
+        }
+
+        SubtitleOsdText.Text = $"{_playlist.CurrentIndex + 1} / {_playlist.Items.Count}";
         SubtitleOsdText.Opacity = 1;
         _osdShownUtc = DateTime.UtcNow;
         _osdFadeTimer.Stop();
