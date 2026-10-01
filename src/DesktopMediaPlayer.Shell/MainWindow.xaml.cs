@@ -1216,6 +1216,16 @@ public partial class MainWindow : Window, IPlaybackObserver
         _osdFadeTimer.Start();
     }
 
+    /// <summary>S61 Soft: OSD "Frame +1"/"Frame -1" after frame-step key; display only.</summary>
+    private void ShowFrameStepOsd(int delta)
+    {
+        SubtitleOsdText.Text = delta > 0 ? "Frame +1" : "Frame -1";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     /// <summary>S23 Soft: Home → Seek(0) via existing Facade Seek.</summary>
     private void SoftSeekHome()
     {
@@ -1656,10 +1666,12 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.OemPeriod:
             case Key.Decimal:
                 _facade.FrameStep(1);
+                ShowFrameStepOsd(1);
                 e.Handled = true;
                 break;
             case Key.OemComma:
                 _facade.FrameStep(-1);
+                ShowFrameStepOsd(-1);
                 e.Handled = true;
                 break;
             case Key.Back:
