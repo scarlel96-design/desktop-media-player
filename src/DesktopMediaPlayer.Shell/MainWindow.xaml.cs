@@ -412,6 +412,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         RefreshTransportEnabled();
+        ShowStoppedOsd();
         ShowChrome();
         _autoHideTimer.Stop();
     }
@@ -1227,6 +1228,16 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         SubtitleOsdText.Text = $"{_playlist.CurrentIndex + 1} / {_playlist.Items.Count}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S64 Soft: OSD "Stopped" after Stop (button/Ctrl+S/MediaStop); display only.</summary>
+    private void ShowStoppedOsd()
+    {
+        SubtitleOsdText.Text = "Stopped";
         SubtitleOsdText.Opacity = 1;
         _osdShownUtc = DateTime.UtcNow;
         _osdFadeTimer.Stop();
