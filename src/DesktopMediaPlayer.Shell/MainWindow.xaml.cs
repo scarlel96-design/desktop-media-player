@@ -1209,7 +1209,13 @@ public partial class MainWindow : Window, IPlaybackObserver
     /// <summary>S23 Soft: Home → Seek(0) via existing Facade Seek.</summary>
     private void SoftSeekHome()
     {
-        _facade?.Seek(0);
+        if (_facade is null)
+        {
+            return;
+        }
+
+        _facade.Seek(0);
+        ShowSeekOsd(0, _facade.GetDuration());
     }
 
     /// <summary>S23 Soft: End → Seek(duration); duration≤0 Soft no-op.</summary>
@@ -1227,6 +1233,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         _facade.Seek(duration);
+        ShowSeekOsd(duration, duration);
     }
 
     /// <summary>S24 Soft: D0–D9 / NumPad → Seek(duration * n / 10); duration≤0 Soft no-op.</summary>
@@ -1244,7 +1251,9 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         var n = Math.Clamp(tenth, 0, 9);
-        _facade.Seek(duration * n / 10.0);
+        var target = duration * n / 10.0;
+        _facade.Seek(target);
+        ShowSeekOsd(target, duration);
     }
 
     private void PollPosition()
