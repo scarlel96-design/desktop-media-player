@@ -2357,10 +2357,10 @@ public partial class MainWindow : Window, IPlaybackObserver
         _autoHideTimer.Stop();
     }
 
-    /// <summary>S62 Soft: OSD "Screenshot saved: file" after screenshot save; display only.</summary>
-    private void ShowScreenshotSavedOsd(string path)
+    /// <summary>S62 Soft: OSD "Screenshot → file" after screenshot save; display only.</summary>
+    private void ShowScreenshotOsd(string path)
     {
-        SubtitleOsdText.Text = $"Screenshot saved: {Path.GetFileName(path)}";
+        SubtitleOsdText.Text = $"Screenshot → {Path.GetFileName(path)}";
         SubtitleOsdText.Opacity = 1;
         _osdShownUtc = DateTime.UtcNow;
         _osdFadeTimer.Stop();
@@ -2404,7 +2404,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
             _facade.Screenshot(dlg.FileName);
             StatusText.Text = $"Screenshot → {dlg.FileName}";
-            ShowScreenshotSavedOsd(dlg.FileName);
+            ShowScreenshotOsd(dlg.FileName);
         }
     }
 
