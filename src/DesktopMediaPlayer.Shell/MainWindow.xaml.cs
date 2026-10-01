@@ -1629,6 +1629,15 @@ public partial class MainWindow : Window, IPlaybackObserver
                 SoftCycleSubtitleTrack();
                 e.Handled = true;
                 break;
+            case Key.Enter:
+                // S65 Soft: Enter on playlist list → same as double-click (PlaySelectedPlaylistItem).
+                if (e.OriginalSource is DependencyObject src && IsDescendantOf(src, PlaylistList))
+                {
+                    PlaySelectedPlaylistItem();
+                    e.Handled = true;
+                }
+
+                break;
             case Key.MediaStop:
                 // S26 Soft: hardware MediaStop → existing Stop Soft.
                 Stop_Click(sender, e);
@@ -1927,6 +1936,11 @@ public partial class MainWindow : Window, IPlaybackObserver
     }
 
     private void PlaylistList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        PlaySelectedPlaylistItem();
+    }
+
+    private void PlaySelectedPlaylistItem()
     {
         if (_playlist is null || PlaylistList.SelectedIndex < 0)
         {
