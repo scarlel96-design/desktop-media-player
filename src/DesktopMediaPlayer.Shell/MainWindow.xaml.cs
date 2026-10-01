@@ -1206,6 +1206,16 @@ public partial class MainWindow : Window, IPlaybackObserver
         _osdFadeTimer.Start();
     }
 
+    /// <summary>S60 Soft: OSD "Paused"/"Play" after Space/MediaPlayPause key; display only.</summary>
+    private void ShowPlayPauseOsd(bool paused)
+    {
+        SubtitleOsdText.Text = paused ? "Paused" : "Play";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     /// <summary>S23 Soft: Home → Seek(0) via existing Facade Seek.</summary>
     private void SoftSeekHome()
     {
@@ -1377,10 +1387,12 @@ public partial class MainWindow : Window, IPlaybackObserver
                 if (_facade.GetState() == PlaybackState.Playing)
                 {
                     Pause_Click(sender, e);
+                    ShowPlayPauseOsd(true);
                 }
                 else
                 {
                     Play_Click(sender, e);
+                    ShowPlayPauseOsd(false);
                 }
 
                 e.Handled = true;
