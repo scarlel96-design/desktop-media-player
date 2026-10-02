@@ -79,6 +79,13 @@ S69 Soft `mpv_event` Windows checks (PENDING, not Known Issues):
 - g. Whether `seek(20)` arrives on Seek.
 - h. No log flood.
 
+S70 Soft SeekSlider bar-click Windows checks (PENDING, not Known Issues):
+- a. Clicking the bar (not the thumb) seeks to the clicked point.
+- b. Dragging the thumb still seeks once on release.
+- c. The thumb does not jump back mid-drag (KI-024 behaviour kept).
+- d. Releasing the mouse outside the slider still commits via LostMouseCapture.
+- e. Hover time popup and keyboard seek are unaffected.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

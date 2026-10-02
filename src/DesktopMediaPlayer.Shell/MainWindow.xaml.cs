@@ -92,7 +92,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             }
         };
         DpiChanged += (_, _) => ResizeRenderHost();
-        // KI-024 Soft: PreviewMouse handlers live in XAML (Down/Up/LostCapture) — no racing Up lambda.
+        // S70 Soft: Slider marks its own mouse-down/up as handled, so XAML attribute handlers never fire on a bar click;
+        // register with handledEventsToo=true (LostMouseCapture stays in XAML; no racing Up lambda).
+        SeekSlider.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(SeekSlider_DragStarted), true);
+        SeekSlider.AddHandler(UIElement.PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(SeekSlider_Committed), true);
         ApplyTheme(_theme);
     }
 
