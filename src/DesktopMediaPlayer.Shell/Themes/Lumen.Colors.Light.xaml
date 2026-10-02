@@ -1,0 +1,37 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Color x:Key="Lumen.Surface.WindowColor">#F4F4F6</Color>
+  <SolidColorBrush x:Key="Lumen.Surface.WindowBrush" Color="{StaticResource Lumen.Surface.WindowColor}" />
+  <Color x:Key="Lumen.Surface.ChromeColor">#F4F4F6</Color>
+  <SolidColorBrush x:Key="Lumen.Surface.ChromeBrush" Color="{StaticResource Lumen.Surface.ChromeColor}" />
+  <Color x:Key="Lumen.Surface.RaisedColor">#FFFFFF</Color>
+  <SolidColorBrush x:Key="Lumen.Surface.RaisedBrush" Color="{StaticResource Lumen.Surface.RaisedColor}" />
+  <Color x:Key="Lumen.Border.SubtleColor">#DADADF</Color>
+  <SolidColorBrush x:Key="Lumen.Border.SubtleBrush" Color="{StaticResource Lumen.Border.SubtleColor}" />
+  <Color x:Key="Lumen.Text.PrimaryColor">#1A1A1C</Color>
+  <SolidColorBrush x:Key="Lumen.Text.PrimaryBrush" Color="{StaticResource Lumen.Text.PrimaryColor}" />
+  <Color x:Key="Lumen.Text.SecondaryColor">#55555C</Color>
+  <SolidColorBrush x:Key="Lumen.Text.SecondaryBrush" Color="{StaticResource Lumen.Text.SecondaryColor}" />
+  <Color x:Key="Lumen.Text.TertiaryColor">#6C6C74</Color>
+  <SolidColorBrush x:Key="Lumen.Text.TertiaryBrush" Color="{StaticResource Lumen.Text.TertiaryColor}" />
+  <Color x:Key="Lumen.Icon.DisabledColor">#A0A0A8</Color>
+  <SolidColorBrush x:Key="Lumen.Icon.DisabledBrush" Color="{StaticResource Lumen.Icon.DisabledColor}" />
+  <Color x:Key="Lumen.AccentColor">#2B5BD0</Color>
+  <SolidColorBrush x:Key="Lumen.AccentBrush" Color="{StaticResource Lumen.AccentColor}" />
+  <Color x:Key="Lumen.Accent.OnAccentColor">#FFFFFF</Color>
+  <SolidColorBrush x:Key="Lumen.Accent.OnAccentBrush" Color="{StaticResource Lumen.Accent.OnAccentColor}" />
+  <Color x:Key="Lumen.State.HoverOverlayColor">#0F000000</Color>
+  <SolidColorBrush x:Key="Lumen.State.HoverOverlayBrush" Color="{StaticResource Lumen.State.HoverOverlayColor}" />
+  <Color x:Key="Lumen.State.PressedOverlayColor">#1F000000</Color>
+  <SolidColorBrush x:Key="Lumen.State.PressedOverlayBrush" Color="{StaticResource Lumen.State.PressedOverlayColor}" />
+  <Color x:Key="Lumen.Track.RailColor">#B8B8C0</Color>
+  <SolidColorBrush x:Key="Lumen.Track.RailBrush" Color="{StaticResource Lumen.Track.RailColor}" />
+  <Color x:Key="Lumen.Track.BufferColor">#4D2B5BD0</Color>
+  <SolidColorBrush x:Key="Lumen.Track.BufferBrush" Color="{StaticResource Lumen.Track.BufferColor}" />
+  <Color x:Key="Lumen.DangerColor">#C62828</Color>
+  <SolidColorBrush x:Key="Lumen.DangerBrush" Color="{StaticResource Lumen.DangerColor}" />
+  <SolidColorBrush x:Key="Lumen.Legacy.WindowBrush" Color="#F2F2F2" />
+  <SolidColorBrush x:Key="Lumen.Legacy.ForegroundBrush" Color="#1A1A1A" />
+  <SolidColorBrush x:Key="Lumen.Legacy.ChromeBrush" Color="#E6F2F2F2" />
+  <SolidColorBrush x:Key="Lumen.Legacy.StatusBrush" Color="#A0000000" />
+</ResourceDictionary>

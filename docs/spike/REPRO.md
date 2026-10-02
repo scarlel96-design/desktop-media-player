@@ -129,6 +129,11 @@ S77 Soft fullscreen bottom band Windows checks (PENDING, not Known Issues):
 - c. Windowed mode: auto-hide leaves the layout unchanged (no resize on hide/show).
 - d. Paused, open flyouts/playlist, or hovering the bar: still never hides, as before.
 
+S78 Soft Lumen F-1 token dictionaries (no Windows check needed; nothing consumes the tokens yet):
+- a. Adds Themes/Lumen.Tokens.Shared.xaml, Lumen.Colors.Dark.xaml, Lumen.Colors.Light.xaml; App.xaml merges Shared and Dark only (Light is unmerged until F-2).
+- b. No visual or behaviour change is expected; the app must still start as before.
+- c. Only if the app fails to start: record the XamlParseException text from the first exception.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
