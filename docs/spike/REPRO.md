@@ -86,6 +86,13 @@ S70 Soft SeekSlider bar-click Windows checks (PENDING, not Known Issues):
 - d. Releasing the mouse outside the slider still commits via LostMouseCapture.
 - e. Hover time popup and keyboard seek are unaffected.
 
+S71 Soft SeekSlider track-drag Windows checks (PENDING, not Known Issues):
+- a. Press on the track (not the thumb) and keep the button down: the thumb jumps to the point, then follows the mouse.
+- b. Releasing seeks once to the release position.
+- c. No jump or flicker of the thumb on the first move after the press.
+- d. A plain click (no move) still seeks to the clicked point; dragging the thumb itself is unchanged.
+- e. Releasing outside the slider still commits via LostMouseCapture; hover popup and keyboard seek are unaffected.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

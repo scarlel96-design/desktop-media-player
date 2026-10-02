@@ -1070,6 +1070,13 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void SeekSlider_DragStarted(object sender, MouseButtonEventArgs e)
     {
         _seekDragging = true;
+        // S71 Soft: Slider already jumped to the clicked point and handled the Down; after layout puts the thumb there,
+        // hand the Down to the thumb so holding and moving drags it (release still commits once via SeekSlider_Committed).
+        if (e.Handled && SeekSlider.Template.FindName("PART_Track", SeekSlider) is System.Windows.Controls.Primitives.Track { Thumb: { } thumb })
+        {
+            SeekSlider.UpdateLayout();
+            thumb.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent, Source = thumb });
+        }
     }
 
     private void SeekSlider_Committed(object sender, MouseButtonEventArgs e)
