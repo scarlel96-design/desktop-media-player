@@ -112,6 +112,11 @@ S74 Soft play/pause toggle Windows checks (PENDING, not Known Issues):
 - c. The old separate Pause button is hidden; Stop, Prev, Next, and auto-hide are unaffected.
 - d. The tooltip matches the icon (Pause while playing, Play otherwise).
 
+S75 Soft Play after end-of-file Windows checks (PENDING, not Known Issues):
+- a. After a video reaches its end, pressing Play restarts it from the beginning.
+- b. Normal Play and Pause during playback are unchanged.
+- c. Pressing Play at a position not near the end does not seek.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

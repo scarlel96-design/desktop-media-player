@@ -391,6 +391,10 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void Play_Click(object sender, RoutedEventArgs e)
     {
+        // S75 Soft: Play at EOF (within 0.25s of end) restarts from 0 (keep-open pause release hypothesis).
+        var duration = _facade?.GetDuration() ?? 0;
+        if (duration > 0 && _facade?.GetPosition() >= duration - 0.25) { _facade?.Seek(0); }
+
         _facade?.Play();
         _positionTimer.Start();
         ArmAutoHide();
