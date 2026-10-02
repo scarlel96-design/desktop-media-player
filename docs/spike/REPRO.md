@@ -75,7 +75,7 @@ S68 Soft `end_file` Windows checks (PENDING, not Known Issues):
 
 S69 Soft `mpv_event` Windows checks (PENDING, not Known Issues):
 - e. Which ids actually arrive on Open.
-- f. Whether id 13 (VIDEO_RECONFIG) arrives.
+- f. Whether id 17 (VIDEO_RECONFIG) arrives (id 13 is handled by the existing case and never appears in this log; infer 13 only from `first_frame` being logged before PLAYBACK_RESTART).
 - g. Whether `seek(20)` arrives on Seek.
 - h. No log flood.
 
