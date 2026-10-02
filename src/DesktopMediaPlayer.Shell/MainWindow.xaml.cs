@@ -2076,13 +2076,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _ => true
         };
 
-        var bg = useDark ? Color.FromRgb(0x12, 0x12, 0x12) : Color.FromRgb(0xF2, 0xF2, 0xF2);
-        var fg = useDark ? Color.FromRgb(0xF0, 0xF0, 0xF0) : Color.FromRgb(0x1A, 0x1A, 0x1A);
-        var chrome = useDark ? Color.FromArgb(0xE6, 0x12, 0x12, 0x12) : Color.FromArgb(0xE6, 0xF2, 0xF2, 0xF2);
-        Background = new SolidColorBrush(bg);
-        Foreground = new SolidColorBrush(fg);
-        BottomChrome.Background = new SolidColorBrush(chrome);
-        StatusText.Foreground = new SolidColorBrush(useDark ? Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xA0, 0x00, 0x00, 0x00));
+        ((App)Application.Current).ApplyColorTheme(useDark);
     }
 
     private static bool IsSystemLightTheme()

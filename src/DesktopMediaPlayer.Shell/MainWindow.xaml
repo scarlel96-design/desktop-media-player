@@ -5,8 +5,8 @@
         Title="Desktop Media Player"
         Width="960" Height="640"
         MinWidth="640" MinHeight="400"
-        Background="#121212"
-        Foreground="#F0F0F0"
+        Background="{DynamicResource Lumen.Legacy.WindowBrush}"
+        Foreground="{DynamicResource Lumen.Legacy.ForegroundBrush}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         KeyDown="Window_KeyDown"
@@ -72,7 +72,7 @@
       <!-- L1 bottom chrome (own Auto row — outside HWND layout box) -->
       <Border x:Name="BottomChrome"
               Grid.Row="1"
-              Background="#E6121212"
+              Background="{DynamicResource Lumen.Legacy.ChromeBrush}"
               MouseLeave="BottomChrome_MouseLeave"
               Padding="16,8,16,8">
         <Grid>
@@ -207,7 +207,7 @@
       </Border>
 
       <StackPanel Grid.Row="0" VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
-        <TextBlock x:Name="StatusText" Text="Ready" Foreground="#A0FFFFFF" TextWrapping="Wrap"/>
+        <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource Lumen.Legacy.StatusBrush}" TextWrapping="Wrap"/>
         <TextBlock x:Name="ErrorText" Foreground="#FF6B6B" Margin="0,6,0,0"
                    TextWrapping="Wrap" Visibility="Collapsed"/>
       </StackPanel>

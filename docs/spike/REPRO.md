@@ -134,6 +134,11 @@ S78 Soft Lumen F-1 token dictionaries (no Windows check needed; nothing consumes
 - b. No visual or behaviour change is expected; the app must still start as before.
 - c. Only if the app fails to start: record the XamlParseException text from the first exception.
 
+S79 Soft Lumen F-2 color theme binding (PENDING, not Known Issues):
+- a. Dark theme looks identical to before (window, bottom bar and status text colors).
+- b. Cycle the theme button Dark, Light, System: window and bottom bar both switch fully; no stale dark bar in Light.
+- c. Only if the app fails to start or the theme does not apply: record the first exception text.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
