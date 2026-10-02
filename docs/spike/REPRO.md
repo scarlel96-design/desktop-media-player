@@ -93,6 +93,13 @@ S71 Soft SeekSlider track-drag Windows checks (PENDING, not Known Issues):
 - d. A plain click (no move) still seeks to the clicked point; dragging the thumb itself is unchanged.
 - e. Releasing outside the slider still commits via LostMouseCapture; hover popup and keyboard seek are unaffected.
 
+S72 Soft `eof_reached` and extra `render_path` items, log-only (Windows checks PENDING, not Known Issues):
+- a. Play a video to the end without pausing: `eof_reached pos=<sec> state=<state>` appears once (no line at open, where the initial value is no).
+- b. State right after `eof_reached` (expected Paused before `end_file`/Ended), and whether the last frame stays on screen.
+- c. Press Play after the end: record what the button does (replay, nothing, or error) and the log lines around it.
+- d. During playback, `render_path` now also carries container-fps, estimated-vf-fps, display-fps, video-params/w, video-params/h, video-params/pixelformat, video-sync, avsync and mistimed-frame-count; record the values.
+- e. Items mpv cannot read are omitted, never an error; vo-delayed-frame-count stays as `vo-drop`.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

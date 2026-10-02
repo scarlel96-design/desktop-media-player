@@ -570,6 +570,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         MpvNative.mpv_observe_property(_mpv, 1, "pause", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 2, "hwdec-current", MpvFormat.String);
+        MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
         LogRenderPath("after_init");
         return true;
@@ -687,6 +688,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
             }
         }
+        else if (string.Equals(name, "eof-reached", StringComparison.Ordinal)
+                 && string.Equals(MpvNative.GetPropertyAndFree(_mpv, "eof-reached"), "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Log("info", "eof_reached", $"pos={MpvNative.GetPropertyAndFree(_mpv, "time-pos") ?? "(n/a)"} state={_state}");
+        }
     }
 
     private void MaybeFirstFrame()
@@ -798,6 +804,16 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var decoderDrop = decoderDropRaw ?? "(n/a)";
         var voDrop = voDropRaw ?? "(n/a)";
         var deltaPart = FormatDropDeltas(now, frameDropRaw, decoderDropRaw, voDropRaw);
+
+        // S72 diagnostics: extra render_path items, omitted when mpv cannot read them (vo-delayed-frame-count is already vo-drop).
+        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count" })
+        {
+            var val = MpvNative.GetPropertyAndFree(_mpv, key);
+            if (val != null)
+            {
+                deltaPart += $" {key}={val}";
+            }
+        }
 
         _logger.Log(
             "info",
