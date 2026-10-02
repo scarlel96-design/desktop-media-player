@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:DesktopMediaPlayer.Shell"
         Title="Desktop Media Player"
         Width="960" Height="640"
-        MinWidth="640" MinHeight="400"
+        MinWidth="{StaticResource Lumen.Size.WindowMinWidth}" MinHeight="400"
         Background="{DynamicResource Lumen.Legacy.WindowBrush}"
         Foreground="{DynamicResource Lumen.Legacy.ForegroundBrush}"
         UseLayoutRounding="True"
