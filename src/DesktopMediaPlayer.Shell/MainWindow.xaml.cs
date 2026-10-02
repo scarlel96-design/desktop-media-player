@@ -2115,6 +2115,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         || TrackFlyout.Visibility == Visibility.Visible
         || PlaylistPanel.Visibility == Visibility.Visible
         || MediaInfoFlyout.Visibility == Visibility.Visible
+        || BottomChrome.IsMouseOver
         || ErrorText.Visibility == Visibility.Visible;
 
     private void ArmAutoHide()
@@ -2126,6 +2127,9 @@ public partial class MainWindow : Window, IPlaybackObserver
             _autoHideTimer.Start();
         }
     }
+
+    // S73 U1-a: re-arm auto-hide once the pointer leaves the bottom chrome.
+    private void BottomChrome_MouseLeave(object sender, MouseEventArgs e) => ArmAutoHide();
 
 
 

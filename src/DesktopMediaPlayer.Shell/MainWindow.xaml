@@ -72,6 +72,7 @@
       <Border x:Name="BottomChrome"
               Grid.Row="1"
               Background="#E6121212"
+              MouseLeave="BottomChrome_MouseLeave"
               Padding="16,8,16,8">
         <Grid>
           <Grid.RowDefinitions>

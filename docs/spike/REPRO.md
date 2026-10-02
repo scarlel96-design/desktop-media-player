@@ -100,6 +100,12 @@ S72 Soft `eof_reached` and extra `render_path` items, log-only (Windows checks P
 - d. During playback, `render_path` now also carries container-fps, estimated-vf-fps, display-fps, video-params/w, video-params/h, video-params/pixelformat, video-sync, avsync and mistimed-frame-count; record the values.
 - e. Items mpv cannot read are omitted, never an error; vo-delayed-frame-count stays as `vo-drop`.
 
+S73 Soft chrome auto-hide hover Windows checks (PENDING, not Known Issues):
+- a. While playing, keep the pointer over the bottom bar: it does not auto-hide.
+- b. Click the seek bar or a transport button, keep the pointer on the bar: it stays visible.
+- c. Move the pointer off the bar: it hides after the usual delay.
+- d. Pause/stop, flyouts, and mouse-move reveal behave as before.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
