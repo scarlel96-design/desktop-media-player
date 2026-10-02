@@ -78,11 +78,11 @@
                       Background="Transparent"
                       IsMoveToPointEnabled="True"
                       LostMouseCapture="SeekSlider_LostCapture"/>
-              <Popup x:Name="HoverTimePopup" AllowsTransparency="True" Placement="Relative"
+              <Popup x:Name="HoverTimePopup" AllowsTransparency="False" PopupAnimation="None" Placement="Relative"
                      PlacementTarget="{Binding ElementName=SeekSlider}" IsOpen="False"
                      IsHitTestVisible="False">
-                <Border Background="#E0181818" CornerRadius="4" Padding="8,4">
-                  <TextBlock x:Name="HoverTimeText" Foreground="#EEE" FontSize="12"/>
+                <Border Background="{DynamicResource Lumen.Surface.RaisedBrush}" BorderBrush="{DynamicResource Lumen.Border.SubtleBrush}" BorderThickness="1" Padding="8,4">
+                  <TextBlock x:Name="HoverTimeText" Foreground="{DynamicResource Lumen.Text.PrimaryBrush}" FontSize="{DynamicResource Lumen.Type.Caption}"/>
                 </Border>
               </Popup>
             </Grid>

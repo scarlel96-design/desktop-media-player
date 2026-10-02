@@ -162,6 +162,10 @@ S84 Soft Lumen P2-3 time labels (PENDING, not Known Issues):
 - a. The elapsed and total time labels keep a steady width (about 56) and the elapsed time is right-aligned; the seek bar does not jitter as the digits change.
 - b. Time text is monospace at size 12 with a softer secondary color, readable in Dark and Light themes.
 
+S85 Soft Lumen T3-3 seek hover time tooltip (PENDING, not Known Issues):
+- a. Hover over the seek bar: the time tooltip shows a solid raised surface with a thin subtle border, square corners, primary text at size 12, and no fade animation.
+- b. The tooltip is readable in Dark and Light themes and still follows the pointer position as before.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
