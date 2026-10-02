@@ -55,6 +55,7 @@ UTF-8 log at `%LocalAppData%\desktop-media-player\spike.log` and Console.
 | `state` | PlaybackState transition |
 | `seek_latency` | S67 Soft (RV-01), log-only: ms from Seek request to PLAYBACK_RESTART (`info`; `warn` when `ms>=1000`). |
 | `end_file` | S68 Soft (RV-02), log-only: END_FILE `reason`/`error` and engine state (`warn` when reason=error). |
+| `mpv_event` | S69 Soft, log-only: mpv event ids not handled by `HandleEvent` (`id`/`name`/engine state). |
 | `error` | Engine/UI error with code/message |
 
 Timestamps are included on every line.
@@ -71,6 +72,12 @@ S68 Soft `end_file` Windows checks (PENDING, not Known Issues):
 - Stop logs `reason=stop`.
 - Corrupt file logs `reason=error` with an `error` code.
 - Opening a new file: whether the previous file logs stop/redirect.
+
+S69 Soft `mpv_event` Windows checks (PENDING, not Known Issues):
+- e. Which ids actually arrive on Open.
+- f. Whether id 13 (VIDEO_RECONFIG) arrives.
+- g. Whether `seek(20)` arrives on Seek.
+- h. No log flood.
 
 ## Evidence checklist (Windows operator)
 

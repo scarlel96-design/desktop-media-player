@@ -656,6 +656,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             case MpvEventIds.PropertyChange:
                 HandlePropertyChange(evt.data);
                 break;
+            default:
+                LogUnhandledEvent(evt.event_id);
+                break;
         }
     }
 
@@ -698,6 +701,20 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
         ReportHwdec();
+    }
+
+    private void LogUnhandledEvent(int id)
+    {
+        var name = id switch
+        {
+            6 => "start_file",
+            11 => "idle",
+            17 => "video_reconfig",
+            18 => "audio_reconfig",
+            20 => "seek",
+            _ => "other",
+        };
+        _logger.Log("info", "mpv_event", $"id={id} name={name} state={_state}");
     }
 
     private void LogEndFile(nint data)
