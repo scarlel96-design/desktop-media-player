@@ -117,6 +117,12 @@ S75 Soft Play after end-of-file Windows checks (PENDING, not Known Issues):
 - b. Normal Play and Pause during playback are unchanged.
 - c. Pressing Play at a position not near the end does not seek.
 
+S76 Soft Space key with a focused button Windows checks (PENDING, not Known Issues):
+- a. Click a transport button (or the play/pause button) so it has focus, then press Space: playback toggles exactly once (no double toggle).
+- b. Enter and Tab on a focused button behave as before.
+- c. Space with no button focused still toggles play/pause once.
+- d. Other keys (arrows, F, M, and so on) are unchanged.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

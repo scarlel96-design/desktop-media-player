@@ -10,6 +10,7 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"

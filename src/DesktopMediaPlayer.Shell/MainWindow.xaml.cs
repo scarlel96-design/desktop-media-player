@@ -1431,6 +1431,14 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    // S76 Soft: a focused Button consumes Space in KeyDown; route Space to Window_KeyDown first and mark it handled (no double Click).
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Space) { return; }
+        Window_KeyDown(sender, e);
+        e.Handled = true;
+    }
+
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
         if (_facade is null)
