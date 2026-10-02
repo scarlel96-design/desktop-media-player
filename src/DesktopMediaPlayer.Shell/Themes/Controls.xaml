@@ -33,4 +33,73 @@
     <Setter Property="Margin" Value="0,0,8,0"/>
     <Setter Property="IsHitTestVisible" Value="False"/>
   </Style>
+  <!-- Lumen T3-2: SeekSlider template. Standard Track/Thumb/RepeatButtons (PART_Track, Track.Thumb kept); rail and buffer are drawn by BufferBar. -->
+  <Style x:Key="LumenSeekSlider" TargetType="Slider">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <ControlTemplate.Resources>
+            <Style x:Key="SeekHitButton" TargetType="RepeatButton">
+              <Setter Property="OverridesDefaultStyle" Value="True"/>
+              <Setter Property="Focusable" Value="False"/>
+              <Setter Property="IsTabStop" Value="False"/>
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent"/>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+            <Style x:Key="SeekFillButton" TargetType="RepeatButton" BasedOn="{StaticResource SeekHitButton}">
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent">
+                      <Border Height="{DynamicResource Lumen.Size.TrackRest}" Margin="0,0,-7,0" VerticalAlignment="Center" Background="{DynamicResource Lumen.AccentBrush}"/>
+                    </Border>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+            <Style x:Key="SeekThumbStyle" TargetType="Thumb">
+              <Setter Property="OverridesDefaultStyle" Value="True"/>
+              <Setter Property="Focusable" Value="False"/>
+              <Setter Property="Width" Value="14"/>
+              <Setter Property="Height" Value="14"/>
+              <Setter Property="Opacity" Value="0"/>
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="Thumb">
+                    <Grid Background="Transparent">
+                      <Ellipse Width="14" Height="14" Fill="{DynamicResource Lumen.Text.PrimaryBrush}"
+                               Stroke="{DynamicResource Lumen.Surface.ChromeBrush}" StrokeThickness="1"/>
+                    </Grid>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ControlTemplate.Resources>
+          <Grid Background="Transparent">
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Style="{StaticResource SeekFillButton}" Command="Slider.DecreaseLarge"/>
+              </Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Style="{StaticResource SeekHitButton}" Command="Slider.IncreaseLarge"/>
+              </Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb x:Name="SeekThumb" Style="{StaticResource SeekThumbStyle}"/>
+              </Track.Thumb>
+            </Track>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SeekThumb" Property="Opacity" Value="1"/></Trigger>
+            <Trigger Property="IsMouseCaptureWithin" Value="True"><Setter TargetName="SeekThumb" Property="Opacity" Value="1"/></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SeekThumb" Property="Opacity" Value="1"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
 </ResourceDictionary>

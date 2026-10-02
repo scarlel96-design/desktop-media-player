@@ -170,6 +170,11 @@ S86 Soft Lumen T3-1 buffer bar colors (PENDING, not Known Issues):
 - a. While a file is playing, the buffered-ahead bar uses the theme buffer color on the theme rail color instead of fixed blue/white.
 - b. The buffer bar is readable in Dark and Light themes and still sits under the seek slider.
 
+S87 Soft Lumen T3-2 seek slider template (PENDING, not Known Issues; high-risk seek):
+- a. During playback, click the seek bar at two different positions: playback jumps to each clicked position and the blue fill follows up to the thumb.
+- b. Hover the seek bar: a round thumb appears only while the pointer is over the bar or while dragging. Drag the thumb and release: playback resumes at the released position.
+- c. Seek log lines (seek_latency) still appear for click and drag, and the hover time tooltip still follows the pointer.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

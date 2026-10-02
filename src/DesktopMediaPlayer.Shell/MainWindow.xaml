@@ -76,6 +76,7 @@
                       Minimum="0" Maximum="3600" Value="0"
                       VerticalAlignment="Center" Height="24"
                       Background="Transparent"
+                      Style="{StaticResource LumenSeekSlider}"
                       IsMoveToPointEnabled="True"
                       LostMouseCapture="SeekSlider_LostCapture"/>
               <Popup x:Name="HoverTimePopup" AllowsTransparency="False" PopupAnimation="None" Placement="Relative"
