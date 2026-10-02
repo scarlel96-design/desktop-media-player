@@ -23,7 +23,7 @@
       <ColumnDefinition x:Name="SideColumn" Width="0"/>
     </Grid.ColumnDefinitions>
 
-    <Grid Grid.Column="0">
+    <Grid Grid.Column="0" Background="{DynamicResource Lumen.Surface.VideoBrush}">
       <!-- KI-022 Soft: separate HWND video row from chrome (airspace). video=* / chrome=Auto -->
       <Grid.RowDefinitions>
         <RowDefinition Height="*"/>
@@ -46,9 +46,11 @@
       <!-- L1 bottom chrome (own Auto row — outside HWND layout box) -->
       <Border x:Name="BottomChrome"
               Grid.Row="1"
-              Background="{DynamicResource Lumen.Legacy.ChromeBrush}"
+              Background="{DynamicResource Lumen.Surface.ChromeBrush}"
+              BorderBrush="{DynamicResource Lumen.Border.SubtleBrush}"
+              BorderThickness="0,1,0,0"
               MouseLeave="BottomChrome_MouseLeave"
-              Padding="16,8,16,8">
+              Padding="16,7,16,8">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="28"/>

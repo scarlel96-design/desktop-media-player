@@ -144,6 +144,11 @@ S80 Soft Lumen F-3 styles moved to Themes/Controls.xaml (PENDING, not Known Issu
 - b. The app starts normally; all three styles still apply (button size 40, side panel border on the left).
 - c. Only if the app fails to start: record the first exception text (a missing style key is a StaticResource error).
 
+S81 Soft Lumen P2-1 chrome surface and video column background (PENDING, not Known Issues):
+- a. The bottom control bar has an opaque dark surface with a thin top line; its height looks unchanged (100) and the flyouts still sit above it.
+- b. The area around the video (letterbox) is pure black in Dark and Light themes; the video itself is not covered by the bar.
+- c. Fullscreen auto-hide and the bar still behave as before; record any visible gap or overlap.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

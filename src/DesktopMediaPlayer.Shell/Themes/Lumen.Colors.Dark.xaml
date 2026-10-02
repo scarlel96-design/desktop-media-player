@@ -6,6 +6,8 @@
   <SolidColorBrush x:Key="Lumen.Surface.ChromeBrush" Color="{StaticResource Lumen.Surface.ChromeColor}" />
   <Color x:Key="Lumen.Surface.RaisedColor">#222225</Color>
   <SolidColorBrush x:Key="Lumen.Surface.RaisedBrush" Color="{StaticResource Lumen.Surface.RaisedColor}" />
+  <Color x:Key="Lumen.Surface.VideoColor">#000000</Color>
+  <SolidColorBrush x:Key="Lumen.Surface.VideoBrush" Color="{StaticResource Lumen.Surface.VideoColor}" />
   <Color x:Key="Lumen.Border.SubtleColor">#2E2E32</Color>
   <SolidColorBrush x:Key="Lumen.Border.SubtleBrush" Color="{StaticResource Lumen.Border.SubtleColor}" />
   <Color x:Key="Lumen.Text.PrimaryColor">#F5F5F7</Color>
