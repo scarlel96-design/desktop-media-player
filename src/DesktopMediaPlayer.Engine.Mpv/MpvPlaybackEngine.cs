@@ -24,11 +24,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private nint _wid;
     private PlaybackState _state = PlaybackState.Idle;
     private bool _firstFrameRaised;
+    private long _seekRequestTs; // RV-01 Soft: Stopwatch ticks of pending seek request; 0 = none.
     private bool _disposed;
     private string? _pendingOpen;
     private int _volume = 100;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
+    private const int SeekSlowMs = 1000;
 
     // KI-014 Soft: absolute drop counters + Δrate between samples (≠ perceived stutter).
     private long? _prevFrameDrop;
@@ -65,6 +67,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     {
         _pendingOpen = path;
         _firstFrameRaised = false;
+        _seekRequestTs = 0;
         ResetDropBaselines();
         SetState(PlaybackState.Opening);
         _logger.Open(path);
@@ -119,6 +122,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public void Stop() => Post(() =>
     {
+        _seekRequestTs = 0;
         if (_mpv == nint.Zero)
         {
             return;
@@ -136,7 +140,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         var cmd = string.Create(CultureInfo.InvariantCulture, $"seek {seconds} absolute");
-        Check(MpvNative.mpv_command_string(_mpv, cmd), "seek");
+        var rc = MpvNative.mpv_command_string(_mpv, cmd);
+        Check(rc, "seek");
+        if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
+        {
+            _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
     });
 
     public void SetVolume(int volume) => Post(() =>
@@ -635,7 +644,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Ended);
                 break;
             case MpvEventIds.VideoReconfig:
+                MaybeFirstFrame();
+                break;
             case MpvEventIds.PlaybackRestart:
+                LogSeekLatency();
                 MaybeFirstFrame();
                 break;
             case MpvEventIds.LogMessage:
@@ -685,6 +697,19 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
         ReportHwdec();
+    }
+
+    private void LogSeekLatency()
+    {
+        if (_seekRequestTs == 0)
+        {
+            return;
+        }
+
+        var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _seekRequestTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
+        _seekRequestTs = 0;
+        var slow = ms >= SeekSlowMs;
+        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow}");
     }
 
     /// <summary>Logs vo / gpu-context / hwdec-current / frame drops for Windows spike evidence.</summary>

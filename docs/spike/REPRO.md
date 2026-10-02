@@ -53,9 +53,16 @@ UTF-8 log at `%LocalAppData%\desktop-media-player\spike.log` and Console.
 | `hwdec_fallback` | Stepped D3D11VA → D3D11VA-copy → software |
 | `render_path` | `vo` / `gpu-context` / `hwdec-current` / `frame-drop` / `decoder-drop` / `vo-drop` + Soft `*-delta`/`*-rate` (after_init, first_frame, state transition, ~2s while Playing). **KI-014:** cumulative drop ≠ stutter; use Δrate. |
 | `state` | PlaybackState transition |
+| `seek_latency` | S67 Soft (RV-01), log-only: ms from Seek request to PLAYBACK_RESTART (`info`; `warn` when `ms>=1000`). |
 | `error` | Engine/UI error with code/message |
 
 Timestamps are included on every line.
+
+S67 Soft `seek_latency` Windows checks (PENDING, not Known Issues):
+- One `seek_latency` line after a real Seek.
+- PLAYBACK_RESTART arrives for a Seek near EOF with `keep-open=yes`.
+- Rapid consecutive Seeks log one line, measured from the earliest request (design limit).
+- Seek while paused.
 
 ## Evidence checklist (Windows operator)
 
