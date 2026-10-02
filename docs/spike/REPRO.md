@@ -54,6 +54,7 @@ UTF-8 log at `%LocalAppData%\desktop-media-player\spike.log` and Console.
 | `render_path` | `vo` / `gpu-context` / `hwdec-current` / `frame-drop` / `decoder-drop` / `vo-drop` + Soft `*-delta`/`*-rate` (after_init, first_frame, state transition, ~2s while Playing). **KI-014:** cumulative drop ≠ stutter; use Δrate. |
 | `state` | PlaybackState transition |
 | `seek_latency` | S67 Soft (RV-01), log-only: ms from Seek request to PLAYBACK_RESTART (`info`; `warn` when `ms>=1000`). |
+| `end_file` | S68 Soft (RV-02), log-only: END_FILE `reason`/`error` and engine state (`warn` when reason=error). |
 | `error` | Engine/UI error with code/message |
 
 Timestamps are included on every line.
@@ -63,6 +64,13 @@ S67 Soft `seek_latency` Windows checks (PENDING, not Known Issues):
 - PLAYBACK_RESTART arrives for a Seek near EOF with `keep-open=yes`.
 - Rapid consecutive Seeks log one line, measured from the earliest request (design limit).
 - Seek while paused.
+
+S68 Soft `end_file` Windows checks (PENDING, not Known Issues):
+- Normal EOF logs `reason=eof` once.
+- END_FILE timing with `keep-open=yes`.
+- Stop logs `reason=stop`.
+- Corrupt file logs `reason=error` with an `error` code.
+- Opening a new file: whether the previous file logs stop/redirect.
 
 ## Evidence checklist (Windows operator)
 

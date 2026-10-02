@@ -641,6 +641,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
                 break;
             case MpvEventIds.EndFile:
+                LogEndFile(evt.data);
                 SetState(PlaybackState.Ended);
                 break;
             case MpvEventIds.VideoReconfig:
@@ -697,6 +698,25 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
         ReportHwdec();
+    }
+
+    private void LogEndFile(nint data)
+    {
+        if (data == nint.Zero)
+        {
+            return;
+        }
+        var end = Marshal.PtrToStructure<MpvEventEndFile>(data);
+        var name = end.reason switch
+        {
+            0 => "eof",
+            2 => "stop",
+            3 => "quit",
+            4 => "error",
+            5 => "redirect",
+            _ => "unknown",
+        };
+        _logger.Log(end.reason == 4 ? "warn" : "info", "end_file", $"reason={name}({end.reason}) error={end.error} state={_state}");
     }
 
     private void LogSeekLatency()
