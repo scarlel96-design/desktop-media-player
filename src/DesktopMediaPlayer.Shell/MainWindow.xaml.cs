@@ -29,6 +29,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private int _lastAudibleVolume = 80;
     private bool _muteUi;
     private bool _chromePinned;
+    private Point _lastMovePos;
     private MediaTrackKind? _flyoutKind;
     private bool _suppressTrackSelection;
     private WindowState _windowStateBeforeFullscreen = WindowState.Normal;
@@ -2101,12 +2102,20 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void Root_MouseMove(object sender, MouseEventArgs e)
     {
+        var pos = e.GetPosition(this);
+        if (pos == _lastMovePos)
+        {
+            return;
+        }
+
+        _lastMovePos = pos;
         ShowChrome();
         ArmAutoHide();
     }
 
     private void ShowChrome()
     {
+        BottomChrome.Visibility = Visibility.Visible;
         BottomChrome.Opacity = 1;
         BottomChrome.IsHitTestVisible = true;
     }
@@ -2127,6 +2136,11 @@ public partial class MainWindow : Window, IPlaybackObserver
         // Opacity-only hide (Blur OFF, no Invalidate spam).
         BottomChrome.Opacity = 0;
         BottomChrome.IsHitTestVisible = false;
+        if (WindowStyle == WindowStyle.None)
+        {
+            // S77 F2: fullscreen only; free the Auto row so no bottom band remains.
+            BottomChrome.Visibility = Visibility.Collapsed;
+        }
     }
 
     private bool ShouldPauseAutoHide() =>

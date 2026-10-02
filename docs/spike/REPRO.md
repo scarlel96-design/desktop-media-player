@@ -123,6 +123,12 @@ S76 Soft Space key with a focused button Windows checks (PENDING, not Known Issu
 - c. Space with no button focused still toggles play/pause once.
 - d. Other keys (arrows, F, M, and so on) are unchanged.
 
+S77 Soft fullscreen bottom band Windows checks (PENDING, not Known Issues):
+- a. Fullscreen playback, let the bar auto-hide: no dark band remains at the bottom of the screen.
+- b. Move the pointer: the bar shows again (the video resizes once); keep the pointer still: no show/hide flicker loop.
+- c. Windowed mode: auto-hide leaves the layout unchanged (no resize on hide/show).
+- d. Paused, open flyouts/playlist, or hovering the bar: still never hides, as before.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
