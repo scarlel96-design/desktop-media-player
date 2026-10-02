@@ -106,6 +106,12 @@ S73 Soft chrome auto-hide hover Windows checks (PENDING, not Known Issues):
 - c. Move the pointer off the bar: it hides after the usual delay.
 - d. Pause/stop, flyouts, and mouse-move reveal behave as before.
 
+S74 Soft play/pause toggle Windows checks (PENDING, not Known Issues):
+- a. The bar shows one play/pause button: pause icon while playing, play icon when paused, stopped, or before opening.
+- b. Clicking it while playing pauses; clicking while paused or stopped plays; Space behaves as before.
+- c. The old separate Pause button is hidden; Stop, Prev, Next, and auto-hide are unaffected.
+- d. The tooltip matches the icon (Pause while playing, Play otherwise).
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

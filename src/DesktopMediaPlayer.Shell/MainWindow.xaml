@@ -122,9 +122,9 @@
                       Content="⏮" ToolTip="Previous (stop at ends)"
                       Click="Prev_Click" IsEnabled="False"/>
               <Button x:Name="PlayButton" Style="{StaticResource TransportButton}"
-                      Content="▶" ToolTip="Play" Click="Play_Click"/>
+                      Content="▶" ToolTip="Play" Click="PlayPause_Click"/>
               <Button x:Name="PauseButton" Style="{StaticResource TransportButton}"
-                      Content="⏸" ToolTip="Pause" Click="Pause_Click"/>
+                      Content="⏸" ToolTip="Pause" Click="Pause_Click" Visibility="Collapsed"/>
               <Button x:Name="StopButton" Style="{StaticResource TransportButton}"
                       Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
               <Button x:Name="NextButton" Style="{StaticResource TransportButton}"

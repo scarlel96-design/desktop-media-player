@@ -404,6 +404,13 @@ public partial class MainWindow : Window, IPlaybackObserver
         _autoHideTimer.Stop();
     }
 
+    // S74 Soft: PlayButton toggles Play/Pause (PauseButton Collapsed); reuses Play_Click/Pause_Click.
+    private void PlayPause_Click(object sender, RoutedEventArgs e)
+    {
+        if (_facade?.GetState() == PlaybackState.Playing) { Pause_Click(sender, e); }
+        else { Play_Click(sender, e); }
+    }
+
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
         PersistResume();
@@ -2375,6 +2382,9 @@ public partial class MainWindow : Window, IPlaybackObserver
                 SetOpeningSpinner(false);
             }
 
+            var playing = state == PlaybackState.Playing;
+            PlayButton.Content = playing ? "⏸" : "▶";
+            PlayButton.ToolTip = playing ? "Pause" : "Play";
             RefreshTransportEnabled();
             RefreshPlaylistUi();
             SyncMuteFromEngine();
