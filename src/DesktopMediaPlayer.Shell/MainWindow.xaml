@@ -95,6 +95,7 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
               <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
                       Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
               <Button x:Name="PrevButton" Style="{StaticResource TransportButton}"
                       Content="⏮" ToolTip="Previous (stop at ends)"
                       Click="Prev_Click" IsEnabled="False"/>
@@ -107,10 +108,12 @@
               <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
                       Content="⏭" ToolTip="Next (stop at ends)"
                       Click="Next_Click" IsEnabled="False"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
               <Button x:Name="FrameBackButton" Style="{StaticResource TransportButton}"
                       Content="⏮|" ToolTip="Frame back" Click="FrameBack_Click"/>
               <Button x:Name="FrameStepButton" Style="{StaticResource TransportButton}"
-                      Content="|⏭" ToolTip="Frame step" Click="FrameStep_Click" Margin="0,0,16,0"/>
+                      Content="|⏭" ToolTip="Frame step" Click="FrameStep_Click"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
             </StackPanel>
 
             <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
@@ -132,6 +135,7 @@
                       Content="CC" ToolTip="Subtitles" Click="Sub_Click"/>
               <Button x:Name="AudioButton" Style="{StaticResource TransportButton}"
                       Content="♪" ToolTip="Audio" Click="Audio_Click"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
               <Button x:Name="PlaylistButton" Style="{StaticResource TransportButton}"
                       Content="≡" ToolTip="Playlist" Click="Playlist_Click"/>
               <Button x:Name="ScreenshotButton" Style="{StaticResource TransportButton}"

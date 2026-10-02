@@ -149,6 +149,11 @@ S81 Soft Lumen P2-1 chrome surface and video column background (PENDING, not Kno
 - b. The area around the video (letterbox) is pure black in Dark and Light themes; the video itself is not covered by the bar.
 - c. Fullscreen auto-hide and the bar still behave as before; record any visible gap or overlap.
 
+S82 Soft Lumen P2-2 control group dividers (PENDING, not Known Issues):
+- a. Thin vertical dividers appear after Open, after Next (Prev/Play/Pause/Stop/Next group), after Frame step, and after Audio; they are not clickable.
+- b. Button order, button size (40) and the bar height (100) look unchanged; the gap before the volume group looks like before.
+- c. Dividers are visible but subtle in both Dark and Light themes.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

@@ -13,6 +13,8 @@
   <sys:Double x:Key="Lumen.Size.ThumbRest">12</sys:Double>
   <sys:Double x:Key="Lumen.Size.ThumbHover">14</sys:Double>
   <sys:Double x:Key="Lumen.Size.VolumeWidth">96</sys:Double>
+  <sys:Double x:Key="Lumen.Size.Divider">1</sys:Double>
+  <sys:Double x:Key="Lumen.Size.DividerHeight">20</sys:Double>
   <CornerRadius x:Key="Lumen.Radius.Control">6</CornerRadius>
   <CornerRadius x:Key="Lumen.Radius.Panel">10</CornerRadius>
   <CornerRadius x:Key="Lumen.Radius.Tooltip">6</CornerRadius>
