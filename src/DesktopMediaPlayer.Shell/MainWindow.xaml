@@ -71,7 +71,7 @@
                   MouseMove="SeekArea_MouseMove" MouseLeave="SeekArea_MouseLeave">
               <ProgressBar x:Name="BufferBar" Height="4" Minimum="0" Maximum="1" Value="0"
                            VerticalAlignment="Center" IsHitTestVisible="False"
-                           Foreground="#4466AA" Background="#22FFFFFF" BorderThickness="0"/>
+                           Foreground="{DynamicResource Lumen.Track.BufferBrush}" Background="{DynamicResource Lumen.Track.RailBrush}" BorderThickness="0"/>
               <Slider x:Name="SeekSlider"
                       Minimum="0" Maximum="3600" Value="0"
                       VerticalAlignment="Center" Height="24"

@@ -166,6 +166,10 @@ S85 Soft Lumen T3-3 seek hover time tooltip (PENDING, not Known Issues):
 - a. Hover over the seek bar: the time tooltip shows a solid raised surface with a thin subtle border, square corners, primary text at size 12, and no fade animation.
 - b. The tooltip is readable in Dark and Light themes and still follows the pointer position as before.
 
+S86 Soft Lumen T3-1 buffer bar colors (PENDING, not Known Issues):
+- a. While a file is playing, the buffered-ahead bar uses the theme buffer color on the theme rail color instead of fixed blue/white.
+- b. The buffer bar is readable in Dark and Light themes and still sits under the seek slider.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
