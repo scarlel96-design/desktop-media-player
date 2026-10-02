@@ -139,6 +139,11 @@ S79 Soft Lumen F-2 color theme binding (PENDING, not Known Issues):
 - b. Cycle the theme button Dark, Light, System: window and bottom bar both switch fully; no stale dark bar in Light.
 - c. Only if the app fails to start or the theme does not apply: record the first exception text.
 
+S80 Soft Lumen F-3 styles moved to Themes/Controls.xaml (PENDING, not Known Issues):
+- a. Transport buttons, caption text and the side panel (playlist/info) look identical to before in the Dark theme.
+- b. The app starts normally; all three styles still apply (button size 40, side panel border on the left).
+- c. Only if the app fails to start: record the first exception text (a missing style key is a StaticResource error).
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded
