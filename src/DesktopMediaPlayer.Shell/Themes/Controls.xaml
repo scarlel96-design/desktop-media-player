@@ -14,10 +14,10 @@
     <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
   </Style>
   <Style x:Key="ChromeCaption" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="12"/>
-    <Setter Property="FontFamily" Value="Consolas"/>
+    <Setter Property="FontSize" Value="{DynamicResource Lumen.Type.Caption}"/>
+    <Setter Property="FontFamily" Value="{DynamicResource Lumen.Font.Mono}"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
-    <Setter Property="Foreground" Value="{DynamicResource Lumen.Legacy.CaptionBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Lumen.Text.SecondaryBrush}"/>
   </Style>
   <Style x:Key="SidePanel" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource Lumen.Legacy.FlyoutBgBrush}"/>

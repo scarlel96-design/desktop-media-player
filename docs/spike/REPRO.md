@@ -158,6 +158,10 @@ S83 Soft Lumen P2-4 window minimum width (PENDING, not Known Issues):
 - a. Drag the window narrower: it stops at about 912 wide (was 640), and the bottom control bar buttons are not cut off at that width.
 - b. The start size (960x640), minimum height (400) and saved window size/position restore look unchanged.
 
+S84 Soft Lumen P2-3 time labels (PENDING, not Known Issues):
+- a. The elapsed and total time labels keep a steady width (about 56) and the elapsed time is right-aligned; the seek bar does not jitter as the digits change.
+- b. Time text is monospace at size 12 with a softer secondary color, readable in Dark and Light themes.
+
 ## Evidence checklist (Windows operator)
 
 - [ ] Release\|x64 build succeeded

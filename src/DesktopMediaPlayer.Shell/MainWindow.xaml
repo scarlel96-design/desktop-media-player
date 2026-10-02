@@ -66,7 +66,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="CurrentTimeText" Grid.Column="0"
                        Style="{StaticResource ChromeCaption}"
-                       Text="--:--" Margin="0,0,12,0"/>
+                       Text="--:--" Margin="0,0,12,0" MinWidth="{StaticResource Lumen.Size.TimeLabelMinWidth}" TextAlignment="Right"/>
             <Grid Grid.Column="1" MinHeight="24" VerticalAlignment="Center"
                   MouseMove="SeekArea_MouseMove" MouseLeave="SeekArea_MouseLeave">
               <ProgressBar x:Name="BufferBar" Height="4" Minimum="0" Maximum="1" Value="0"
@@ -88,7 +88,7 @@
             </Grid>
             <TextBlock x:Name="TotalTimeText" Grid.Column="2"
                        Style="{StaticResource ChromeCaption}"
-                       Text="--:--" Margin="12,0,0,0"/>
+                       Text="--:--" Margin="12,0,0,0" MinWidth="{StaticResource Lumen.Size.TimeLabelMinWidth}"/>
           </Grid>
 
           <DockPanel Grid.Row="2" LastChildFill="False">
