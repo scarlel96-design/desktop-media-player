@@ -156,8 +156,9 @@
               <Button x:Name="InfoButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
                       Content="{DynamicResource Lumen.Icon.Info}" ToolTip="Media info"
                       AutomationProperties.Name="Media info" Click="Info_Click"/>
-              <Button x:Name="ThemeButton" Style="{StaticResource TransportButton}"
-                      Content="◐" ToolTip="Theme: Dark/Light/System" Click="Theme_Click"/>
+              <Button x:Name="ThemeButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.ThemeDark}" ToolTip="Theme: Dark/Light/System"
+                      AutomationProperties.Name="Theme" Click="Theme_Click"/>
               <Button x:Name="FullscreenButton" Style="{StaticResource LumenIconButton}" Margin="0"
                       Content="{DynamicResource Lumen.Icon.FullscreenEnter}" ToolTip="Fullscreen"
                       AutomationProperties.Name="Fullscreen" Click="Fullscreen_Click"/>

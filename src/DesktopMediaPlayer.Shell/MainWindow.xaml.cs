@@ -2058,12 +2058,13 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void RefreshThemeButton()
     {
         ThemeButton.ToolTip = $"Theme: {_theme} (click to cycle)";
-        ThemeButton.Content = _theme switch
+        var key = _theme switch
         {
-            AppThemeMode.Dark => "◐",
-            AppThemeMode.Light => "◑",
-            _ => "◎"
+            AppThemeMode.Dark => "Lumen.Icon.ThemeDark",
+            AppThemeMode.Light => "Lumen.Icon.ThemeLight",
+            _ => "Lumen.Icon.ThemeSystem"
         };
+        if (TryFindResource(key) is Geometry icon) ThemeButton.Content = icon;
     }
 
     private void ApplyTheme(AppThemeMode mode)
