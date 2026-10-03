@@ -97,6 +97,8 @@ public partial class MainWindow : Window, IPlaybackObserver
         // register with handledEventsToo=true (LostMouseCapture stays in XAML; no racing Up lambda).
         SeekSlider.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(SeekSlider_DragStarted), true);
         SeekSlider.AddHandler(UIElement.PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(SeekSlider_Committed), true);
+        // S96 Soft: same handledEventsToo registration for the volume bar (IsMoveToPoint handles the Down before the thumb can capture).
+        VolumeSlider.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(VolumeSlider_DragStarted), true);
         ApplyTheme(_theme);
     }
 
@@ -1087,6 +1089,16 @@ public partial class MainWindow : Window, IPlaybackObserver
         if (e.Handled && SeekSlider.Template.FindName("PART_Track", SeekSlider) is System.Windows.Controls.Primitives.Track { Thumb: { } thumb })
         {
             SeekSlider.UpdateLayout();
+            thumb.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent, Source = thumb });
+        }
+    }
+
+    private void VolumeSlider_DragStarted(object sender, MouseButtonEventArgs e)
+    {
+        // S96 Soft: after the click jump, hand the Down to the thumb so holding and moving keeps dragging.
+        if (e.Handled && VolumeSlider.Template.FindName("PART_Track", VolumeSlider) is System.Windows.Controls.Primitives.Track { Thumb: { } thumb })
+        {
+            VolumeSlider.UpdateLayout();
             thumb.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent, Source = thumb });
         }
     }

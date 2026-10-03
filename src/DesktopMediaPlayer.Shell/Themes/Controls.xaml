@@ -102,6 +102,65 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <!-- Lumen V5-1: VolumeSlider template. Same structure as LumenSeekSlider; no BufferBar here so the template draws the rail. -->
+  <Style x:Key="LumenVolumeSlider" TargetType="Slider">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <ControlTemplate.Resources>
+            <Style x:Key="VolHitButton" TargetType="RepeatButton">
+              <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Focusable" Value="False"/><Setter Property="IsTabStop" Value="False"/>
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent">
+                      <Border Height="{DynamicResource Lumen.Size.TrackRest}" Margin="-7,0,0,0" VerticalAlignment="Center" Background="{DynamicResource Lumen.Track.RailBrush}"/>
+                    </Border>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+            <Style x:Key="VolFillButton" TargetType="RepeatButton" BasedOn="{StaticResource VolHitButton}">
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent">
+                      <Border Height="{DynamicResource Lumen.Size.TrackRest}" Margin="0,0,-7,0" VerticalAlignment="Center" Background="{DynamicResource Lumen.AccentBrush}"/>
+                    </Border>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+            <Style x:Key="VolThumbStyle" TargetType="Thumb">
+              <Setter Property="OverridesDefaultStyle" Value="True"/><Setter Property="Focusable" Value="False"/>
+              <Setter Property="Width" Value="14"/><Setter Property="Height" Value="14"/><Setter Property="Opacity" Value="0"/>
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="Thumb">
+                    <Grid Background="Transparent"><Ellipse Width="14" Height="14" Fill="{DynamicResource Lumen.Text.PrimaryBrush}" Stroke="{DynamicResource Lumen.Surface.ChromeBrush}" StrokeThickness="1"/></Grid>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ControlTemplate.Resources>
+          <Grid Background="Transparent">
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton><RepeatButton Style="{StaticResource VolFillButton}" Command="Slider.DecreaseLarge"/></Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton><RepeatButton Style="{StaticResource VolHitButton}" Command="Slider.IncreaseLarge"/></Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb x:Name="VolThumb" Style="{StaticResource VolThumbStyle}"/>
+              </Track.Thumb>
+            </Track>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="VolThumb" Property="Opacity" Value="1"/></Trigger>
+            <Trigger Property="IsMouseCaptureWithin" Value="True"><Setter TargetName="VolThumb" Property="Opacity" Value="1"/></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="VolThumb" Property="Opacity" Value="1"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <!-- Lumen P4-3: icon button templates (unapplied; consumers added in a later Atomic). -->
   <Style x:Key="LumenIconButton" TargetType="Button">
     <Setter Property="OverridesDefaultStyle" Value="True"/>
