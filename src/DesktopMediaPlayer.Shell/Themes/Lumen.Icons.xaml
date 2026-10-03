@@ -13,7 +13,7 @@
   <StreamGeometry x:Key="Lumen.Icon.Next" po:Freeze="True">M16.25,6.25 H17.5 V17.75 H16.25 Z M6.5,6.25 V17.75 L13.25,12 Z</StreamGeometry>
   <StreamGeometry x:Key="Lumen.Icon.Open" po:Freeze="True">M12,5.75 L6.75,12.5 H17.25 Z M6.75,15.75 H17.25 V16.5 H6.75 Z</StreamGeometry>
   <!-- FrameStep: triangle ring (outer/inner offset +-0.25 around M6.75,6.5 V17.5 L14.25,12 Z) + bar at x=17.25 -->
-  <StreamGeometry x:Key="Lumen.Icon.FrameStep" FillRule="EvenOdd" po:Freeze="True">M6.5,6.01 L6.5,17.99 L14.67,12 Z M7,6.99 L7,17.01 L13.83,12 Z M17,6.5 H17.5 V17.5 H17 Z</StreamGeometry>
+  <StreamGeometry x:Key="Lumen.Icon.FrameStep" po:Freeze="True">F0 M6.5,6.01 L6.5,17.99 L14.67,12 Z M7,6.99 L7,17.01 L13.83,12 Z M17,6.5 H17.5 V17.5 H17 Z</StreamGeometry>
   <!-- FrameBack: triangle ring (around M17.25,6.5 V17.5 L9.75,12 Z) + bar at x=6.75 -->
-  <StreamGeometry x:Key="Lumen.Icon.FrameBack" FillRule="EvenOdd" po:Freeze="True">M17.5,6.01 L17.5,17.99 L9.33,12 Z M17,6.99 L17,17.01 L10.17,12 Z M6.5,6.5 H7 V17.5 H6.5 Z</StreamGeometry>
+  <StreamGeometry x:Key="Lumen.Icon.FrameBack" po:Freeze="True">F0 M17.5,6.01 L17.5,17.99 L9.33,12 Z M17,6.99 L17,17.01 L10.17,12 Z M6.5,6.5 H7 V17.5 H6.5 Z</StreamGeometry>
 </ResourceDictionary>
