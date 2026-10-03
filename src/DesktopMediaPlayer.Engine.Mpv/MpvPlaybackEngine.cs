@@ -24,11 +24,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private nint _wid;
     private PlaybackState _state = PlaybackState.Idle;
     private bool _firstFrameRaised;
+    private long _seekRequestTs; // RV-01 Soft: Stopwatch ticks of pending seek request; 0 = none.
     private bool _disposed;
     private string? _pendingOpen;
     private int _volume = 100;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
+    private const int SeekSlowMs = 1000;
 
     // KI-014 Soft: absolute drop counters + Δrate between samples (≠ perceived stutter).
     private long? _prevFrameDrop;
@@ -65,6 +67,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     {
         _pendingOpen = path;
         _firstFrameRaised = false;
+        _seekRequestTs = 0;
         ResetDropBaselines();
         SetState(PlaybackState.Opening);
         _logger.Open(path);
@@ -119,6 +122,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public void Stop() => Post(() =>
     {
+        _seekRequestTs = 0;
         if (_mpv == nint.Zero)
         {
             return;
@@ -136,7 +140,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         var cmd = string.Create(CultureInfo.InvariantCulture, $"seek {seconds} absolute");
-        Check(MpvNative.mpv_command_string(_mpv, cmd), "seek");
+        var rc = MpvNative.mpv_command_string(_mpv, cmd);
+        Check(rc, "seek");
+        if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
+        {
+            _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
     });
 
     public void SetVolume(int volume) => Post(() =>
@@ -561,6 +570,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         MpvNative.mpv_observe_property(_mpv, 1, "pause", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 2, "hwdec-current", MpvFormat.String);
+        MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
         LogRenderPath("after_init");
         return true;
@@ -632,16 +642,23 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
                 break;
             case MpvEventIds.EndFile:
+                LogEndFile(evt.data);
                 SetState(PlaybackState.Ended);
                 break;
             case MpvEventIds.VideoReconfig:
+                MaybeFirstFrame();
+                break;
             case MpvEventIds.PlaybackRestart:
+                LogSeekLatency();
                 MaybeFirstFrame();
                 break;
             case MpvEventIds.LogMessage:
                 break;
             case MpvEventIds.PropertyChange:
                 HandlePropertyChange(evt.data);
+                break;
+            default:
+                LogUnhandledEvent(evt.event_id);
                 break;
         }
     }
@@ -671,6 +688,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
             }
         }
+        else if (string.Equals(name, "eof-reached", StringComparison.Ordinal)
+                 && string.Equals(MpvNative.GetPropertyAndFree(_mpv, "eof-reached"), "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Log("info", "eof_reached", $"pos={MpvNative.GetPropertyAndFree(_mpv, "time-pos") ?? "(n/a)"} state={_state}");
+        }
     }
 
     private void MaybeFirstFrame()
@@ -685,6 +707,52 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
         ReportHwdec();
+    }
+
+    private void LogUnhandledEvent(int id)
+    {
+        var name = id switch
+        {
+            6 => "start_file",
+            11 => "idle",
+            17 => "video_reconfig",
+            18 => "audio_reconfig",
+            20 => "seek",
+            _ => "other",
+        };
+        _logger.Log("info", "mpv_event", $"id={id} name={name} state={_state}");
+    }
+
+    private void LogEndFile(nint data)
+    {
+        if (data == nint.Zero)
+        {
+            return;
+        }
+        var end = Marshal.PtrToStructure<MpvEventEndFile>(data);
+        var name = end.reason switch
+        {
+            0 => "eof",
+            2 => "stop",
+            3 => "quit",
+            4 => "error",
+            5 => "redirect",
+            _ => "unknown",
+        };
+        _logger.Log(end.reason == 4 ? "warn" : "info", "end_file", $"reason={name}({end.reason}) error={end.error} state={_state}");
+    }
+
+    private void LogSeekLatency()
+    {
+        if (_seekRequestTs == 0)
+        {
+            return;
+        }
+
+        var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _seekRequestTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
+        _seekRequestTs = 0;
+        var slow = ms >= SeekSlowMs;
+        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow}");
     }
 
     /// <summary>Logs vo / gpu-context / hwdec-current / frame drops for Windows spike evidence.</summary>
@@ -736,6 +804,16 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var decoderDrop = decoderDropRaw ?? "(n/a)";
         var voDrop = voDropRaw ?? "(n/a)";
         var deltaPart = FormatDropDeltas(now, frameDropRaw, decoderDropRaw, voDropRaw);
+
+        // S72 diagnostics: extra render_path items, omitted when mpv cannot read them (vo-delayed-frame-count is already vo-drop).
+        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count" })
+        {
+            var val = MpvNative.GetPropertyAndFree(_mpv, key);
+            if (val != null)
+            {
+                deltaPart += $" {key}={val}";
+            }
+        }
 
         _logger.Log(
             "info",

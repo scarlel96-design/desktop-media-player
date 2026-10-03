@@ -39,6 +39,21 @@ public partial class App : Application
         ResumeStore = new FileResumeStore();
     }
 
+    internal void ApplyColorTheme(bool dark)
+    {
+        var d = new ResourceDictionary { Source = new System.Uri(dark ? "Themes/Lumen.Colors.Dark.xaml" : "Themes/Lumen.Colors.Light.xaml", System.UriKind.Relative) };
+        var m = Resources.MergedDictionaries;
+        for (var i = 0; i < m.Count; i++)
+        {
+            if (m[i].Source?.OriginalString.Contains("Lumen.Colors.") == true)
+            {
+                m[i] = d;
+                return;
+            }
+        }
+        m.Add(d);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         try

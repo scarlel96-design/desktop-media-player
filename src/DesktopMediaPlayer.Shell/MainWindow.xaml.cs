@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -27,6 +28,8 @@ public partial class MainWindow : Window, IPlaybackObserver
     private double _durationSeconds;
     private int _lastAudibleVolume = 80;
     private bool _muteUi;
+    private bool _chromePinned;
+    private Point _lastMovePos;
     private MediaTrackKind? _flyoutKind;
     private bool _suppressTrackSelection;
     private WindowState _windowStateBeforeFullscreen = WindowState.Normal;
@@ -90,8 +93,12 @@ public partial class MainWindow : Window, IPlaybackObserver
             }
         };
         DpiChanged += (_, _) => ResizeRenderHost();
-        SeekSlider.PreviewMouseLeftButtonDown += (_, _) => _seekDragging = true;
-        SeekSlider.PreviewMouseLeftButtonUp += (_, _) => _seekDragging = false;
+        // S70 Soft: Slider marks its own mouse-down/up as handled, so XAML attribute handlers never fire on a bar click;
+        // register with handledEventsToo=true (LostMouseCapture stays in XAML; no racing Up lambda).
+        SeekSlider.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(SeekSlider_DragStarted), true);
+        SeekSlider.AddHandler(UIElement.PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(SeekSlider_Committed), true);
+        // S96 Soft: same handledEventsToo registration for the volume bar (IsMoveToPoint handles the Down before the thumb can capture).
+        VolumeSlider.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(VolumeSlider_DragStarted), true);
         ApplyTheme(_theme);
     }
 
@@ -111,12 +118,16 @@ public partial class MainWindow : Window, IPlaybackObserver
         _facade.AddObserver(this);
         RefreshTransportEnabled();
         ApplyPersistedVolumePrefs();
+        ApplyPersistedPlaylistPrefs();
         RefreshThemeButton();
 
         TryAttachRenderHost();
         ResizeRenderHost();
         UpdateTimeLabels(0, 0);
         ShowChrome();
+        ApplyPersistedChromePinPrefs();
+        ApplyPersistedTopmostPrefs();
+        ApplyPersistedPlaylistPanelPrefs();
 
         if (!_facade.TryProbe(out var detail))
         {
@@ -170,6 +181,12 @@ public partial class MainWindow : Window, IPlaybackObserver
         ".flac", ".mp3", ".m4a", ".aac", ".wav", ".ogg"
     };
 
+    // S55 Soft: same list as the Sub button dialog filter.
+    private static readonly HashSet<string> SubtitleExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".srt", ".ass", ".ssa", ".vtt", ".sub"
+    };
+
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
@@ -179,9 +196,28 @@ public partial class MainWindow : Window, IPlaybackObserver
             Multiselect = true
         };
 
+        // S40 Soft: OpenFileDialog InitialDirectory from LocalAppData Soft prefs.
+        if (LastOpenDirectoryPrefsStore.TryLoad(out var lastDir) && Directory.Exists(lastDir))
+        {
+            dlg.InitialDirectory = lastDir;
+        }
+
         if (dlg.ShowDialog(this) != true || dlg.FileNames.Length == 0)
         {
             return;
+        }
+
+        try
+        {
+            var dir = Path.GetDirectoryName(dlg.FileNames[0]);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                LastOpenDirectoryPrefsStore.Persist(dir);
+            }
+        }
+        catch
+        {
+            // Soft ignore path/IO failures.
         }
 
         OpenMediaFiles(dlg.FileNames);
@@ -191,7 +227,10 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
-        e.Effects = HasDroppableMedia(e.Data) ? DragDropEffects.Copy : DragDropEffects.None;
+        // S55 Soft: subtitle-only drop also allowed when a subtitle can actually be loaded; same predicate as Drop.
+        e.Effects = HasDroppableMedia(e.Data) || CanDropSubtitle(e.Data)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -199,11 +238,85 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         if (!TryGetDroppedMediaPaths(e.Data, out var paths) || paths.Count == 0)
         {
+            // S55 Soft: no media in drop → first subtitle file only Soft (mixed drops keep OpenMediaFiles path).
+            if (CanDropSubtitle(e.Data) && TryGetDroppedSubtitlePath(e.Data, out var sub))
+            {
+                SoftLoadDroppedSubtitle(sub);
+                e.Handled = true;
+            }
+
             return;
         }
 
         OpenMediaFiles(paths);
         e.Handled = true;
+    }
+
+    /// <summary>S55 Soft: subtitle drop only when no media in drop, facade present and media loaded (not Idle/Opening/Stopped/Error).</summary>
+    private bool CanDropSubtitle(IDataObject data)
+    {
+        try
+        {
+            if (_facade is null || HasDroppableMedia(data))
+            {
+                return false;
+            }
+
+            var state = _facade.GetState();
+            if (state is PlaybackState.Idle or PlaybackState.Opening or PlaybackState.Stopped or PlaybackState.Error)
+            {
+                return false;
+            }
+
+            return TryGetDroppedSubtitlePath(data, out _);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryGetDroppedSubtitlePath(IDataObject data, out string path)
+    {
+        path = string.Empty;
+        if (data is null
+            || !data.GetDataPresent(DataFormats.FileDrop)
+            || data.GetData(DataFormats.FileDrop) is not string[] files)
+        {
+            return false;
+        }
+
+        foreach (var file in files)
+        {
+            if (!string.IsNullOrWhiteSpace(file)
+                && File.Exists(file)
+                && SubtitleExtensions.Contains(Path.GetExtension(file)))
+            {
+                path = file;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>S55 Soft: existing LoadExternalSubtitle + PopulateTrackList(Subtitle); no facade or exception Soft no-op.</summary>
+    private void SoftLoadDroppedSubtitle(string path)
+    {
+        try
+        {
+            if (_facade is null)
+            {
+                return;
+            }
+
+            _facade.LoadExternalSubtitle(path);
+            PopulateTrackList(MediaTrackKind.Subtitle);
+        }
+        catch
+        {
+            // Soft no-op.
+        }
     }
 
     private static bool HasDroppableMedia(IDataObject data) =>
@@ -274,12 +387,17 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
 
     private void Play_Click(object sender, RoutedEventArgs e)
     {
+        // S75 Soft: Play at EOF (within 0.25s of end) restarts from 0 (keep-open pause release hypothesis).
+        var duration = _facade?.GetDuration() ?? 0;
+        if (duration > 0 && _facade?.GetPosition() >= duration - 0.25) { _facade?.Seek(0); }
+
         _facade?.Play();
         _positionTimer.Start();
         ArmAutoHide();
@@ -293,6 +411,13 @@ public partial class MainWindow : Window, IPlaybackObserver
         _autoHideTimer.Stop();
     }
 
+    // S74 Soft: PlayButton toggles Play/Pause (PauseButton Collapsed); reuses Play_Click/Pause_Click.
+    private void PlayPause_Click(object sender, RoutedEventArgs e)
+    {
+        if (_facade?.GetState() == PlaybackState.Playing) { Pause_Click(sender, e); }
+        else { Play_Click(sender, e); }
+    }
+
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
         PersistResume();
@@ -304,6 +429,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
 
         RefreshTransportEnabled();
+        ShowStoppedOsd();
         ShowChrome();
         _autoHideTimer.Stop();
     }
@@ -315,6 +441,8 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        ShowPlaylistPositionOsd();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -326,6 +454,8 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        ShowPlaylistPositionOsd();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -401,6 +531,7 @@ public partial class MainWindow : Window, IPlaybackObserver
 
         RefreshMuteGlyph();
         PersistVolumePrefs();
+        ShowMuteOsd();
     }
 
     private void VolumeGroup_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -456,6 +587,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void ToggleAlwaysOnTop()
     {
         Topmost = !Topmost;
+        PersistTopmostPrefs();
         ShowTopmostOsd();
     }
 
@@ -477,10 +609,458 @@ public partial class MainWindow : Window, IPlaybackObserver
         _osdFadeTimer.Start();
     }
 
+    /// <summary>S25 Soft: Mute On/Off Opacity OSD (same Soft path as ShowVolumeOsd).</summary>
+    private void ShowMuteOsd()
+    {
+        SubtitleOsdText.Text = _muteUi ? "Mute On" : "Mute Off";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S30 Soft: copy current media path to Clipboard; missing path Soft no-op.</summary>
+    private void SoftCopyCurrentPath()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(path);
+            SubtitleOsdText.Text = "Path copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
+    /// <summary>S47 Soft: copy current media filename Soft to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyCurrentFilename()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var name = Path.GetFileName(path);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(name);
+            SubtitleOsdText.Text = "Filename copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
+    /// <summary>S48 Soft: copy current media directory path Soft to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyDirectoryPath()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var dir = Path.GetDirectoryName(path);
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(dir);
+            SubtitleOsdText.Text = "Folder copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
+    /// <summary>S49 Soft: copy media title Soft to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyMediaTitle()
+    {
+        string? title = null;
+        try
+        {
+            if (_facade is not null)
+            {
+                title = _facade.GetMediaInfo().Title;
+            }
+        }
+        catch
+        {
+            // Soft ignore GetMediaInfo failures.
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            string? path = null;
+            if (_playlist is not null
+                && _playlist.CurrentIndex >= 0
+                && _playlist.CurrentIndex < _playlist.Items.Count)
+            {
+                path = _playlist.Items[_playlist.CurrentIndex];
+            }
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path = _currentPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                title = Path.GetFileNameWithoutExtension(path);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(title);
+            SubtitleOsdText.Text = "Title copied";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore clipboard failures.
+        }
+    }
+
+    /// <summary>S50 Soft: copy playback position Soft FormatTime to Clipboard; missing Soft no-op.</summary>
+    private void SoftCopyTimestamp()
+    {
+        if (_facade is null) return;
+        double pos;
+        try { pos = _facade.GetPosition(); }
+        catch { return; }
+        if (double.IsNaN(pos) || pos < 0) return;
+        var text = FormatTime(pos, durationKnown: true); // existing Shell FormatTime Soft; 0 → "00:00"
+        if (string.IsNullOrWhiteSpace(text) || text == "--:--") return;
+        try {
+          Clipboard.SetText(text);
+          SubtitleOsdText.Text = "Time copied";
+          SubtitleOsdText.Opacity = 1;
+          _osdShownUtc = DateTime.UtcNow;
+          _osdFadeTimer.Stop();
+          _osdFadeTimer.Start();
+        } catch { /* Soft ignore clipboard Soft */ }
+    }
+
+    /// <summary>S51 Soft: copy media duration Soft FormatTime to Clipboard; unknown/invalid Soft no-op.</summary>
+    private void SoftCopyDuration()
+    {
+        if (_facade is null) return;
+        double dur;
+        try { dur = _facade.GetDuration(); }
+        catch { return; }
+        if (double.IsNaN(dur) || double.IsInfinity(dur) || dur <= 0) return;
+        var text = FormatTime(dur, durationKnown: true); // existing Shell FormatTime Soft
+        if (string.IsNullOrWhiteSpace(text) || text == "--:--") return;
+        try {
+          Clipboard.SetText(text);
+          SubtitleOsdText.Text = "Length copied";
+          SubtitleOsdText.Opacity = 1;
+          _osdShownUtc = DateTime.UtcNow;
+          _osdFadeTimer.Stop();
+          _osdFadeTimer.Start();
+        } catch { /* Soft ignore clipboard Soft */ }
+    }
+
+    /// <summary>S52 Soft: copy remaining time Soft (duration - position, min 0) FormatTime to Clipboard; invalid Soft no-op.</summary>
+    private void SoftCopyRemaining()
+    {
+        if (_facade is null) return;
+        double dur;
+        double pos;
+        try { dur = _facade.GetDuration(); pos = _facade.GetPosition(); }
+        catch { return; }
+        if (double.IsNaN(dur) || double.IsInfinity(dur) || dur <= 0) return;
+        if (double.IsNaN(pos) || pos < 0) return;
+        var remaining = Math.Max(0, dur - pos);
+        var text = FormatTime(remaining, durationKnown: true); // existing Shell FormatTime Soft
+        if (string.IsNullOrWhiteSpace(text) || text == "--:--") return;
+        try {
+          Clipboard.SetText(text);
+          SubtitleOsdText.Text = "Remaining copied";
+          SubtitleOsdText.Opacity = 1;
+          _osdShownUtc = DateTime.UtcNow;
+          _osdFadeTimer.Stop();
+          _osdFadeTimer.Start();
+        } catch { /* Soft ignore clipboard Soft */ }
+    }
+
+    /// <summary>S53 Soft: Backspace → reset subtitle offset to 0 Soft via existing Facade SetSubtitleOffset + OSD; already 0 or no facade Soft no-op.</summary>
+    private void SoftResetSubtitleOffset()
+    {
+        try
+        {
+            if (_facade is null || _subtitleOffsetSeconds == 0)
+            {
+                return;
+            }
+
+            _subtitleOffsetSeconds = 0;
+            _facade.SetSubtitleOffset(0);
+            ShowSubtitleOffsetOsd();
+        }
+        catch
+        {
+            // Soft no-op.
+        }
+    }
+
+    /// <summary>S39 Soft: Explorer /select current media path Soft; missing path Soft no-op.</summary>
+    private void SoftShowInFolder()
+    {
+        string? path = null;
+        if (_playlist is not null
+            && _playlist.CurrentIndex >= 0
+            && _playlist.CurrentIndex < _playlist.Items.Count)
+        {
+            path = _playlist.Items[_playlist.CurrentIndex];
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = _currentPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = "/select," + '"' + path + '"',
+                UseShellExecute = true
+            });
+            SubtitleOsdText.Text = "Shown in folder";
+            SubtitleOsdText.Opacity = 1;
+            _osdShownUtc = DateTime.UtcNow;
+            _osdFadeTimer.Stop();
+            _osdFadeTimer.Start();
+        }
+        catch
+        {
+            // Soft ignore explorer launch failures.
+        }
+    }
+
+    /// <summary>S42 Soft: cycle audio tracks Soft via ListTracks+SelectTrack Soft wrap; no flyout Soft open.</summary>
+    private void SoftCycleAudioTrack()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var tracks = _facade.ListTracks()
+            .Where(t => t.Kind == MediaTrackKind.Audio)
+            .ToList();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIdx = -1;
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (tracks[i].IsSelected)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        var nextIdx = selectedIdx < 0 ? 0 : (selectedIdx + 1) % tracks.Count;
+        var next = tracks[nextIdx];
+        _facade.SelectTrack(MediaTrackKind.Audio, next.Id);
+
+        var label = next.Title ?? next.Language ?? ("#" + next.Id);
+        SubtitleOsdText.Text = "Audio " + label;
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S43 Soft: cycle subtitle tracks Soft via ListTracks+SelectTrack Soft wrap; no flyout Soft open.</summary>
+    private void SoftCycleSubtitleTrack()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var tracks = _facade.ListTracks()
+            .Where(t => t.Kind == MediaTrackKind.Subtitle)
+            .ToList();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIdx = -1;
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (tracks[i].IsSelected)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        var nextIdx = selectedIdx < 0 ? 0 : (selectedIdx + 1) % tracks.Count;
+        var next = tracks[nextIdx];
+        _facade.SelectTrack(MediaTrackKind.Subtitle, next.Id);
+
+        var label = next.Title ?? next.Language ?? ("#" + next.Id);
+        SubtitleOsdText.Text = "Subtitle " + label;
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S44 Soft: cycle video tracks Soft via ListTracks+SelectTrack Soft wrap; no flyout Soft open.</summary>
+    private void SoftCycleVideoTrack()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var tracks = _facade.ListTracks()
+            .Where(t => t.Kind == MediaTrackKind.Video)
+            .ToList();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        var selectedIdx = -1;
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (tracks[i].IsSelected)
+            {
+                selectedIdx = i;
+                break;
+            }
+        }
+
+        var nextIdx = selectedIdx < 0 ? 0 : (selectedIdx + 1) % tracks.Count;
+        var next = tracks[nextIdx];
+        _facade.SelectTrack(MediaTrackKind.Video, next.Id);
+
+        var label = next.Title ?? next.Language ?? ("#" + next.Id);
+        SubtitleOsdText.Text = "Video " + label;
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S35 Soft: toggle chrome pin Soft (no persist).</summary>
+    private void SoftToggleChromePin()
+    {
+        _chromePinned = !_chromePinned;
+        if (_chromePinned)
+        {
+            ShowChrome();
+            _autoHideTimer.Stop();
+            SubtitleOsdText.Text = "Chrome pinned";
+        }
+        else
+        {
+            ArmAutoHide();
+            SubtitleOsdText.Text = "Chrome unpinned";
+        }
+
+        PersistChromePinPrefs();
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     private void RefreshMuteGlyph()
     {
         var muted = _muteUi || VolumeSlider.Value <= 0;
-        MuteButton.Content = muted ? "🔇" : "🔊";
+        if (TryFindResource(muted ? "Lumen.Icon.VolumeOff" : "Lumen.Icon.VolumeOn") is Geometry icon) MuteButton.Content = icon;
         MuteButton.ToolTip = muted ? "Unmute" : "Mute";
     }
 
@@ -499,16 +1079,49 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    // KI-024 Soft: unify PreviewMouse drag/commit; keep _seekDragging until after Facade Seek
+    // so ApplyTimeline/OnPositionChanged cannot overwrite the thumb mid-drag.
+    private void SeekSlider_DragStarted(object sender, MouseButtonEventArgs e)
+    {
+        _seekDragging = true;
+        // S71 Soft: Slider already jumped to the clicked point and handled the Down; after layout puts the thumb there,
+        // hand the Down to the thumb so holding and moving drags it (release still commits once via SeekSlider_Committed).
+        if (e.Handled && SeekSlider.Template.FindName("PART_Track", SeekSlider) is System.Windows.Controls.Primitives.Track { Thumb: { } thumb })
+        {
+            SeekSlider.UpdateLayout();
+            thumb.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent, Source = thumb });
+        }
+    }
+
+    private void VolumeSlider_DragStarted(object sender, MouseButtonEventArgs e)
+    {
+        // S96 Soft: after the click jump, hand the Down to the thumb so holding and moving keeps dragging.
+        if (e.Handled && VolumeSlider.Template.FindName("PART_Track", VolumeSlider) is System.Windows.Controls.Primitives.Track { Thumb: { } thumb })
+        {
+            VolumeSlider.UpdateLayout();
+            thumb.RaiseEvent(new MouseButtonEventArgs(e.MouseDevice, e.Timestamp, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent, Source = thumb });
+        }
+    }
+
     private void SeekSlider_Committed(object sender, MouseButtonEventArgs e)
     {
-        _seekDragging = false;
-        CommitSeek();
+        EndSeekDrag();
     }
 
     private void SeekSlider_LostCapture(object sender, MouseEventArgs e)
     {
-        _seekDragging = false;
+        EndSeekDrag();
+    }
+
+    private void EndSeekDrag()
+    {
+        if (!_seekDragging)
+        {
+            return;
+        }
+
         CommitSeek();
+        _seekDragging = false;
     }
 
 
@@ -596,6 +1209,135 @@ public partial class MainWindow : Window, IPlaybackObserver
         PersistResume();
     }
 
+    /// <summary>S22 Soft: PageUp/PageDown ±60s via existing Facade Seek, duration-clamped Soft.</summary>
+    private void SoftSeekBySeconds(double deltaSeconds)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var position = _facade.GetPosition();
+        var duration = _facade.GetDuration();
+        var target = position + deltaSeconds;
+        if (duration > 0)
+        {
+            target = Math.Clamp(target, 0, duration);
+        }
+        else
+        {
+            target = Math.Max(0, target);
+        }
+
+        _facade.Seek(target);
+        ShowSeekOsd(target, duration);
+    }
+
+    /// <summary>S57 Soft: OSD "position / duration" after keyboard seek; display only.</summary>
+    private void ShowSeekOsd(double target, double duration)
+    {
+        SubtitleOsdText.Text = $"{FormatTime(target, true)} / {FormatTime(duration, duration > 0)}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S60 Soft: OSD "Paused"/"Play" after Space/MediaPlayPause key; display only.</summary>
+    private void ShowPlayPauseOsd(bool paused)
+    {
+        SubtitleOsdText.Text = paused ? "Paused" : "Play";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S63 Soft: OSD "n / total" after previous/next track; display only.</summary>
+    private void ShowPlaylistPositionOsd()
+    {
+        if (_playlist is null || _playlist.CurrentIndex < 0 || _playlist.CurrentIndex >= _playlist.Items.Count)
+        {
+            return;
+        }
+
+        SubtitleOsdText.Text = $"{_playlist.CurrentIndex + 1} / {_playlist.Items.Count}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S64 Soft: OSD "Stopped" after Stop (button/Ctrl+S/MediaStop); display only.</summary>
+    private void ShowStoppedOsd()
+    {
+        SubtitleOsdText.Text = "Stopped";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S61 Soft: OSD "Frame +1"/"Frame -1" after frame-step key; display only.</summary>
+    private void ShowFrameStepOsd(int delta)
+    {
+        SubtitleOsdText.Text = delta > 0 ? "Frame +1" : "Frame -1";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
+    /// <summary>S23 Soft: Home → Seek(0) via existing Facade Seek.</summary>
+    private void SoftSeekHome()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        _facade.Seek(0);
+        ShowSeekOsd(0, _facade.GetDuration());
+    }
+
+    /// <summary>S23 Soft: End → Seek(duration); duration≤0 Soft no-op.</summary>
+    private void SoftSeekEnd()
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var duration = _facade.GetDuration();
+        if (duration <= 0)
+        {
+            return;
+        }
+
+        _facade.Seek(duration);
+        ShowSeekOsd(duration, duration);
+    }
+
+    /// <summary>S24 Soft: D0–D9 / NumPad → Seek(duration * n / 10); duration≤0 Soft no-op.</summary>
+    private void SoftSeekFraction(int tenth)
+    {
+        if (_facade is null)
+        {
+            return;
+        }
+
+        var duration = _facade.GetDuration();
+        if (duration <= 0)
+        {
+            return;
+        }
+
+        var n = Math.Clamp(tenth, 0, 9);
+        var target = duration * n / 10.0;
+        _facade.Seek(target);
+        ShowSeekOsd(target, duration);
+    }
+
     private void PollPosition()
     {
         if (_facade is null)
@@ -618,6 +1360,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         UpdateTimeLabels(positionSeconds, _durationSeconds);
         UpdateBufferBar(positionSeconds);
 
+        // KI-024 Soft: never write SeekSlider.Value while user is dragging/committing.
         if (_seekDragging)
         {
             return;
@@ -701,6 +1444,14 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    // S76 Soft: a focused Button consumes Space in KeyDown; route Space to Window_KeyDown first and mark it handled (no double Click).
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Space) { return; }
+        Window_KeyDown(sender, e);
+        e.Handled = true;
+    }
+
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
         if (_facade is null)
@@ -711,23 +1462,133 @@ public partial class MainWindow : Window, IPlaybackObserver
         switch (e.Key)
         {
             case Key.Space:
+            case Key.MediaPlayPause:
+                // S26 Soft: hardware MediaPlayPause → existing Play/Pause toggle Soft.
                 if (_facade.GetState() == PlaybackState.Playing)
                 {
                     Pause_Click(sender, e);
+                    ShowPlayPauseOsd(true);
                 }
                 else
                 {
                     Play_Click(sender, e);
+                    ShowPlayPauseOsd(false);
                 }
 
                 e.Handled = true;
                 break;
+            case Key.Left when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S37 Soft: Ctrl+Shift+Left → Seek(pos-30) Soft, duration-clamped.
+                SoftSeekBySeconds(-30);
+                e.Handled = true;
+                break;
+            case Key.Left when (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift:
+                // S33 Soft: Shift+Left → Seek(pos-10) Soft, duration-clamped.
+                SoftSeekBySeconds(-10);
+                e.Handled = true;
+                break;
+            case Key.Left when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                // S34 Soft: Ctrl+Left → existing PlayPrevious Soft (no wrap).
+                Prev_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.Left:
-                _facade.Seek(Math.Max(0, _facade.GetPosition() - 5));
+                SoftSeekBySeconds(-5);
+                e.Handled = true;
+                break;
+            case Key.Right when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S37 Soft: Ctrl+Shift+Right → Seek(pos+30) Soft, duration-clamped.
+                SoftSeekBySeconds(30);
+                e.Handled = true;
+                break;
+            case Key.Right when (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift:
+                // S33 Soft: Shift+Right → Seek(pos+10) Soft, duration-clamped.
+                SoftSeekBySeconds(10);
+                e.Handled = true;
+                break;
+            case Key.Right when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
+                // S34 Soft: Ctrl+Right → existing PlayNext Soft (no wrap).
+                Next_Click(sender, e);
                 e.Handled = true;
                 break;
             case Key.Right:
-                _facade.Seek(_facade.GetPosition() + 5);
+                SoftSeekBySeconds(5);
+                e.Handled = true;
+                break;
+            case Key.PageUp:
+                SoftSeekBySeconds(60);
+                e.Handled = true;
+                break;
+            case Key.PageDown:
+                SoftSeekBySeconds(-60);
+                e.Handled = true;
+                break;
+            case Key.Home:
+                SoftSeekHome();
+                e.Handled = true;
+                break;
+            case Key.End:
+                SoftSeekEnd();
+                e.Handled = true;
+                break;
+            case Key.D0:
+            case Key.NumPad0:
+                SoftSeekFraction(0);
+                e.Handled = true;
+                break;
+            case Key.D1:
+            case Key.NumPad1:
+                SoftSeekFraction(1);
+                e.Handled = true;
+                break;
+            case Key.D2:
+            case Key.NumPad2:
+                SoftSeekFraction(2);
+                e.Handled = true;
+                break;
+            case Key.D3:
+            case Key.NumPad3:
+                SoftSeekFraction(3);
+                e.Handled = true;
+                break;
+            case Key.D4:
+            case Key.NumPad4:
+                SoftSeekFraction(4);
+                e.Handled = true;
+                break;
+            case Key.D5:
+            case Key.NumPad5:
+                SoftSeekFraction(5);
+                e.Handled = true;
+                break;
+            case Key.D6:
+            case Key.NumPad6:
+                SoftSeekFraction(6);
+                e.Handled = true;
+                break;
+            case Key.D7:
+            case Key.NumPad7:
+                SoftSeekFraction(7);
+                e.Handled = true;
+                break;
+            case Key.D8:
+            case Key.NumPad8:
+                SoftSeekFraction(8);
+                e.Handled = true;
+                break;
+            case Key.D9:
+            case Key.NumPad9:
+                SoftSeekFraction(9);
+                e.Handled = true;
+                break;
+            case Key.Up when Keyboard.Modifiers == ModifierKeys.Shift:
+                // S54 Soft: Shift+Up → fine volume +1 Soft via existing AdjustVolumeBySteps; Shift only Soft.
+                AdjustVolumeBySteps(1);
+                e.Handled = true;
+                break;
+            case Key.Down when Keyboard.Modifiers == ModifierKeys.Shift:
+                // S54 Soft: Shift+Down → fine volume -1 Soft via existing AdjustVolumeBySteps; Shift only Soft.
+                AdjustVolumeBySteps(-1);
                 e.Handled = true;
                 break;
             case Key.Up:
@@ -742,25 +1603,135 @@ public partial class MainWindow : Window, IPlaybackObserver
                 Mute_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.A:
+                // S42 Soft: cycle audio tracks Soft (wrap Soft); flyout Soft not opened.
+                SoftCycleAudioTrack();
+                e.Handled = true;
+                break;
+            case Key.V:
+                // S44 Soft: cycle video tracks Soft (wrap Soft); flyout Soft not opened.
+                SoftCycleVideoTrack();
+                e.Handled = true;
+                break;
             case Key.F:
             case Key.F11:
                 ToggleFullscreen();
                 e.Handled = true;
                 break;
-            case Key.Escape when WindowStyle == WindowStyle.None:
-                ToggleFullscreen();
-                e.Handled = true;
+            case Key.Escape:
+                // S31 Soft: dismiss Track/MediaInfo flyouts first; fullscreen Exit Soft only if none open.
+                if (SoftTryDismissFlyouts())
+                {
+                    e.Handled = true;
+                    break;
+                }
+
+                if (WindowStyle == WindowStyle.None)
+                {
+                    ToggleFullscreen();
+                    e.Handled = true;
+                }
+
                 break;
             case Key.O when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Open_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.C when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S30 Soft: Ctrl+Shift+C → current media path Clipboard Soft.
+                SoftCopyCurrentPath();
+                e.Handled = true;
+                break;
+            case Key.N when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S47 Soft: Ctrl+Shift+N → current media filename Clipboard Soft.
+                SoftCopyCurrentFilename();
+                e.Handled = true;
+                break;
+            case Key.D when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S48 Soft: Ctrl+Shift+D → current media directory path Clipboard Soft.
+                SoftCopyDirectoryPath();
+                e.Handled = true;
+                break;
+            case Key.H when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S35 Soft: Ctrl+Shift+H → Soft Pin Chrome toggle (no persist).
+                SoftToggleChromePin();
+                e.Handled = true;
+                break;
+            case Key.E when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S39 Soft: Ctrl+Shift+E → Explorer /select current media Soft.
+                SoftShowInFolder();
                 e.Handled = true;
                 break;
             case Key.S when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Stop_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.S:
+                // S43 Soft: bare S → cycle subtitle tracks Soft (wrap Soft); Ctrl+S Stop Soft unchanged.
+                SoftCycleSubtitleTrack();
+                e.Handled = true;
+                break;
+            case Key.Enter:
+                // S65 Soft: Enter on playlist list → same as double-click (PlaySelectedPlaylistItem).
+                if (e.OriginalSource is DependencyObject src && IsDescendantOf(src, PlaylistList))
+                {
+                    PlaySelectedPlaylistItem();
+                    e.Handled = true;
+                }
+
+                break;
+            case Key.MediaStop:
+                // S26 Soft: hardware MediaStop → existing Stop Soft.
+                Stop_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.MediaNextTrack:
+                // S27 Soft: hardware MediaNextTrack → existing PlayNext Soft (no wrap).
+                Next_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.MediaPreviousTrack:
+                // S27 Soft: hardware MediaPreviousTrack → existing PlayPrevious Soft (no wrap).
+                Prev_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.VolumeUp:
+                // S28 Soft: hardware VolumeUp → existing AdjustVolumeBySteps(+5) Soft.
+                AdjustVolumeBySteps(5);
+                e.Handled = true;
+                break;
+            case Key.VolumeDown:
+                // S28 Soft: hardware VolumeDown → existing AdjustVolumeBySteps(-5) Soft.
+                AdjustVolumeBySteps(-5);
+                e.Handled = true;
+                break;
+            case Key.VolumeMute:
+                // S29 Soft: hardware VolumeMute → existing Mute toggle Soft (SetMute/ShowMuteOsd).
+                Mute_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.R when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S52 Soft: Ctrl+Shift+R → remaining time Clipboard Soft.
+                SoftCopyRemaining();
+                e.Handled = true;
+                break;
+            case Key.L when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S51 Soft: Ctrl+Shift+L → media duration Clipboard Soft.
+                SoftCopyDuration();
+                e.Handled = true;
+                break;
+            case Key.P when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S50 Soft: Ctrl+Shift+P → playback timestamp Clipboard Soft.
+                SoftCopyTimestamp();
+                e.Handled = true;
+                break;
             case Key.P when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
                 Playlist_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.T when (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == (ModifierKeys.Control | ModifierKeys.Shift):
+                // S49 Soft: Ctrl+Shift+T → media title Clipboard Soft.
+                SoftCopyMediaTitle();
                 e.Handled = true;
                 break;
             case Key.T when (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control:
@@ -774,10 +1745,22 @@ public partial class MainWindow : Window, IPlaybackObserver
             case Key.OemPeriod:
             case Key.Decimal:
                 _facade.FrameStep(1);
+                ShowFrameStepOsd(1);
                 e.Handled = true;
                 break;
             case Key.OemComma:
                 _facade.FrameStep(-1);
+                ShowFrameStepOsd(-1);
+                e.Handled = true;
+                break;
+            case Key.Back:
+                // S53 Soft: Backspace → reset subtitle offset Soft; text input Soft skip.
+                if (e.OriginalSource is System.Windows.Controls.TextBox)
+                {
+                    break;
+                }
+
+                SoftResetSubtitleOffset();
                 e.Handled = true;
                 break;
             case Key.OemOpenBrackets:
@@ -843,6 +1826,40 @@ public partial class MainWindow : Window, IPlaybackObserver
         ArmAutoHide();
     }
 
+    /// <summary>S31 Soft: close TrackFlyout / MediaInfoFlyout if visible. Returns true if any dismissed.</summary>
+    private bool SoftTryDismissFlyouts()
+    {
+        var dismissed = false;
+        if (TrackFlyout.Visibility == Visibility.Visible)
+        {
+            TrackFlyout.Visibility = Visibility.Collapsed;
+            _flyoutKind = null;
+            dismissed = true;
+        }
+
+        if (MediaInfoFlyout.Visibility == Visibility.Visible)
+        {
+            MediaInfoFlyout.Visibility = Visibility.Collapsed;
+            dismissed = true;
+        }
+
+        // S32 Soft: Escape also Soft-closes PlaylistPanel when open (before FS Exit Soft).
+        if (PlaylistPanel.Visibility == Visibility.Visible)
+        {
+            PlaylistPanel.Visibility = Visibility.Collapsed;
+            SideColumn.Width = new GridLength(0);
+            PersistPlaylistPanelPrefs();
+            dismissed = true;
+        }
+
+        if (dismissed)
+        {
+            ArmAutoHide();
+        }
+
+        return dismissed;
+    }
+
     private void ToggleTrackFlyout(MediaTrackKind kind, string title)
     {
         if (_flyoutKind == kind && TrackFlyout.Visibility == Visibility.Visible)
@@ -859,6 +1876,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         TrackFlyout.Visibility = Visibility.Visible;
         PlaylistPanel.Visibility = Visibility.Collapsed;
         SideColumn.Width = new GridLength(0);
+        PersistPlaylistPanelPrefs();
         ShowChrome();
         _autoHideTimer.Stop();
     }
@@ -910,8 +1928,28 @@ public partial class MainWindow : Window, IPlaybackObserver
             Title = "Load external subtitle",
             Filter = "Subtitles|*.srt;*.ass;*.ssa;*.vtt;*.sub|All files|*.*"
         };
+
+        // S41 Soft: reuse LastOpenDirectoryPrefsStore Soft (same prefs as Open media Soft).
+        if (LastOpenDirectoryPrefsStore.TryLoad(out var lastDir) && Directory.Exists(lastDir))
+        {
+            dlg.InitialDirectory = lastDir;
+        }
+
         if (dlg.ShowDialog(this) == true)
         {
+            try
+            {
+                var dir = Path.GetDirectoryName(dlg.FileName);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    LastOpenDirectoryPrefsStore.Persist(dir);
+                }
+            }
+            catch
+            {
+                // Soft ignore path/IO failures.
+            }
+
             _facade.LoadExternalSubtitle(dlg.FileName);
             PopulateTrackList(MediaTrackKind.Subtitle);
         }
@@ -934,9 +1972,17 @@ public partial class MainWindow : Window, IPlaybackObserver
         {
             ArmAutoHide();
         }
+
+        // S45 Soft: persist PlaylistPanel Visibility Soft (+ SideColumn Width Soft pair).
+        PersistPlaylistPanelPrefs();
     }
 
     private void PlaylistList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        PlaySelectedPlaylistItem();
+    }
+
+    private void PlaySelectedPlaylistItem()
     {
         if (_playlist is null || PlaylistList.SelectedIndex < 0)
         {
@@ -948,6 +1994,7 @@ public partial class MainWindow : Window, IPlaybackObserver
         SyncCurrentPathFromPlaylist();
         RefreshTransportEnabled();
         RefreshPlaylistUi();
+        PersistPlaylistPrefs();
         _positionTimer.Start();
         ArmAutoHide();
     }
@@ -956,17 +2003,53 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         if (_playlist is null)
         {
+            if (PlaylistClearButton is not null)
+            {
+                PlaylistClearButton.IsEnabled = false;
+            }
+
             return;
         }
 
         PlaylistList.Items.Clear();
         var items = _playlist.Items;
         PlaylistEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (PlaylistClearButton is not null)
+        {
+            // S21 Soft: Clear disabled when empty.
+            PlaylistClearButton.IsEnabled = items.Count > 0;
+        }
+
         for (var i = 0; i < items.Count; i++)
         {
             var marker = i == _playlist.CurrentIndex ? "▶ " : "  ";
             PlaylistList.Items.Add($"{marker}{System.IO.Path.GetFileName(items[i])}");
         }
+
+        // S66 Soft: select + scroll to current item (out of range: no selection).
+        if (_playlist.CurrentIndex >= 0 && _playlist.CurrentIndex < items.Count)
+        {
+            PlaylistList.SelectedIndex = _playlist.CurrentIndex;
+            PlaylistList.ScrollIntoView(PlaylistList.SelectedItem);
+        }
+    }
+
+    // --- S21 Soft Playlist Clear ---
+
+    private void PlaylistClear_Click(object sender, RoutedEventArgs e)
+    {
+        if (_playlist is null || _playlist.Items.Count == 0)
+        {
+            return;
+        }
+
+        PersistResume();
+        _playlist.Clear();
+        PlaylistList.SelectedIndex = -1;
+        RefreshPlaylistUi();
+        RefreshTransportEnabled();
+        PersistPlaylistPrefs();
+        ArmAutoHide();
     }
 
     // --- S6 theme / auto-hide / resume ---
@@ -987,12 +2070,13 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void RefreshThemeButton()
     {
         ThemeButton.ToolTip = $"Theme: {_theme} (click to cycle)";
-        ThemeButton.Content = _theme switch
+        var key = _theme switch
         {
-            AppThemeMode.Dark => "◐",
-            AppThemeMode.Light => "◑",
-            _ => "◎"
+            AppThemeMode.Dark => "Lumen.Icon.ThemeDark",
+            AppThemeMode.Light => "Lumen.Icon.ThemeLight",
+            _ => "Lumen.Icon.ThemeSystem"
         };
+        if (TryFindResource(key) is Geometry icon) ThemeButton.Content = icon;
     }
 
     private void ApplyTheme(AppThemeMode mode)
@@ -1005,13 +2089,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _ => true
         };
 
-        var bg = useDark ? Color.FromRgb(0x12, 0x12, 0x12) : Color.FromRgb(0xF2, 0xF2, 0xF2);
-        var fg = useDark ? Color.FromRgb(0xF0, 0xF0, 0xF0) : Color.FromRgb(0x1A, 0x1A, 0x1A);
-        var chrome = useDark ? Color.FromArgb(0xE6, 0x12, 0x12, 0x12) : Color.FromArgb(0xE6, 0xF2, 0xF2, 0xF2);
-        Background = new SolidColorBrush(bg);
-        Foreground = new SolidColorBrush(fg);
-        BottomChrome.Background = new SolidColorBrush(chrome);
-        StatusText.Foreground = new SolidColorBrush(useDark ? Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xA0, 0x00, 0x00, 0x00));
+        ((App)Application.Current).ApplyColorTheme(useDark);
     }
 
     private static bool IsSystemLightTheme()
@@ -1031,12 +2109,20 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     private void Root_MouseMove(object sender, MouseEventArgs e)
     {
+        var pos = e.GetPosition(this);
+        if (pos == _lastMovePos)
+        {
+            return;
+        }
+
+        _lastMovePos = pos;
         ShowChrome();
         ArmAutoHide();
     }
 
     private void ShowChrome()
     {
+        BottomChrome.Visibility = Visibility.Visible;
         BottomChrome.Opacity = 1;
         BottomChrome.IsHitTestVisible = true;
     }
@@ -1057,12 +2143,19 @@ public partial class MainWindow : Window, IPlaybackObserver
         // Opacity-only hide (Blur OFF, no Invalidate spam).
         BottomChrome.Opacity = 0;
         BottomChrome.IsHitTestVisible = false;
+        if (WindowStyle == WindowStyle.None)
+        {
+            // S77 F2: fullscreen only; free the Auto row so no bottom band remains.
+            BottomChrome.Visibility = Visibility.Collapsed;
+        }
     }
 
     private bool ShouldPauseAutoHide() =>
-        TrackFlyout.Visibility == Visibility.Visible
+        _chromePinned
+        || TrackFlyout.Visibility == Visibility.Visible
         || PlaylistPanel.Visibility == Visibility.Visible
         || MediaInfoFlyout.Visibility == Visibility.Visible
+        || BottomChrome.IsMouseOver
         || ErrorText.Visibility == Visibility.Visible;
 
     private void ArmAutoHide()
@@ -1075,6 +2168,9 @@ public partial class MainWindow : Window, IPlaybackObserver
         }
     }
 
+    // S73 U1-a: re-arm auto-hide once the pointer leaves the bottom chrome.
+    private void BottomChrome_MouseLeave(object sender, MouseEventArgs e) => ArmAutoHide();
+
 
 
     // --- S19 Theme prefs Soft ---
@@ -1083,6 +2179,55 @@ public partial class MainWindow : Window, IPlaybackObserver
         ThemePrefsStore.TryLoad(out var theme) ? theme : AppThemeMode.Dark;
 
     private void PersistThemePrefs() => ThemePrefsStore.Persist(_theme);
+
+    // --- S36 Chrome pin prefs Soft ---
+
+    private void ApplyPersistedChromePinPrefs()
+    {
+        if (!ChromePinPrefsStore.TryLoad(out var pinned) || !pinned)
+        {
+            return;
+        }
+
+        _chromePinned = true;
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void PersistChromePinPrefs() => ChromePinPrefsStore.Persist(_chromePinned);
+
+    // --- S45 Playlist panel prefs Soft ---
+
+    private void ApplyPersistedPlaylistPanelPrefs()
+    {
+        if (!PlaylistPanelPrefsStore.TryLoad(out var open) || !open)
+        {
+            return;
+        }
+
+        PlaylistPanel.Visibility = Visibility.Visible;
+        SideColumn.Width = new GridLength(300);
+        RefreshPlaylistUi();
+        ShowChrome();
+        _autoHideTimer.Stop();
+    }
+
+    private void PersistPlaylistPanelPrefs() =>
+        PlaylistPanelPrefsStore.Persist(PlaylistPanel.Visibility == Visibility.Visible);
+
+    // --- S38 Topmost prefs Soft ---
+
+    private void ApplyPersistedTopmostPrefs()
+    {
+        if (!TopmostPrefsStore.TryLoad(out var topmost))
+        {
+            return;
+        }
+
+        Topmost = topmost;
+    }
+
+    private void PersistTopmostPrefs() => TopmostPrefsStore.Persist(Topmost);
 
     // --- S18 Volume prefs Soft ---
 
@@ -1111,6 +2256,48 @@ public partial class MainWindow : Window, IPlaybackObserver
     {
         var volume = (int)Math.Round(Math.Clamp(VolumeSlider.Value, 0, 100));
         VolumePrefsStore.Persist(volume, _muteUi);
+    }
+
+    // --- S20 Playlist prefs Soft ---
+
+    private void ApplyPersistedPlaylistPrefs()
+    {
+        if (_playlist is null)
+        {
+            return;
+        }
+
+        if (!PlaylistPrefsStore.TryLoad(out var paths, out _))
+        {
+            return;
+        }
+
+        _playlist.Clear();
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            {
+                // Soft skip missing / blank paths — no auto Open/Play.
+                continue;
+            }
+
+            _playlist.Add(path);
+        }
+
+        // Soft: restore list only (Architecture). Do not PlayAt/Open.
+        RefreshPlaylistUi();
+        RefreshTransportEnabled();
+    }
+
+    private void PersistPlaylistPrefs()
+    {
+        if (_playlist is null)
+        {
+            PlaylistPrefsStore.Persist(Array.Empty<string>(), -1);
+            return;
+        }
+
+        PlaylistPrefsStore.Persist(_playlist.Items, _playlist.CurrentIndex);
     }
 
     private void PersistResume()
@@ -1179,7 +2366,24 @@ public partial class MainWindow : Window, IPlaybackObserver
             RefreshPlaylistUi();
             ArmAutoHide();
             ApplyPendingResumeAtFirstFrame();
+            SoftUpdateWindowTitle();
         });
+    }
+
+    // S56 Soft: window title = "<file> - Desktop Media Player"; read-only on _currentPath, no-op on failure.
+    private void SoftUpdateWindowTitle()
+    {
+        try
+        {
+            var name = string.IsNullOrWhiteSpace(_currentPath) ? null : Path.GetFileName(_currentPath);
+            if (!string.IsNullOrEmpty(name))
+            {
+                Title = $"{name} - Desktop Media Player";
+            }
+        }
+        catch
+        {
+        }
     }
 
     public void OnStateChanged(PlaybackState state)
@@ -1211,6 +2415,9 @@ public partial class MainWindow : Window, IPlaybackObserver
                 SetOpeningSpinner(false);
             }
 
+            var playing = state == PlaybackState.Playing;
+            if (TryFindResource(playing ? "Lumen.Icon.Pause" : "Lumen.Icon.Play") is Geometry icon) PlayButton.Content = icon;
+            PlayButton.ToolTip = playing ? "Pause" : "Play";
             RefreshTransportEnabled();
             RefreshPlaylistUi();
             SyncMuteFromEngine();
@@ -1256,6 +2463,16 @@ public partial class MainWindow : Window, IPlaybackObserver
         _autoHideTimer.Stop();
     }
 
+    /// <summary>S62 Soft: OSD "Screenshot → file" after screenshot save; display only.</summary>
+    private void ShowScreenshotOsd(string path)
+    {
+        SubtitleOsdText.Text = $"Screenshot → {Path.GetFileName(path)}";
+        SubtitleOsdText.Opacity = 1;
+        _osdShownUtc = DateTime.UtcNow;
+        _osdFadeTimer.Stop();
+        _osdFadeTimer.Start();
+    }
+
     private void Screenshot_Click(object sender, RoutedEventArgs e)
     {
         if (_facade is null)
@@ -1269,10 +2486,31 @@ public partial class MainWindow : Window, IPlaybackObserver
             Filter = "PNG image|*.png|JPEG image|*.jpg",
             FileName = $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.png"
         };
+
+        // S46 Soft: reuse LastOpenDirectoryPrefsStore Soft (same prefs Soft as Open/Sub Soft).
+        if (LastOpenDirectoryPrefsStore.TryLoad(out var lastDir) && Directory.Exists(lastDir))
+        {
+            dlg.InitialDirectory = lastDir;
+        }
+
         if (dlg.ShowDialog(this) == true)
         {
+            try
+            {
+                var dir = Path.GetDirectoryName(dlg.FileName);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    LastOpenDirectoryPrefsStore.Persist(dir);
+                }
+            }
+            catch
+            {
+                // Soft ignore path/IO failures.
+            }
+
             _facade.Screenshot(dlg.FileName);
             StatusText.Text = $"Screenshot → {dlg.FileName}";
+            ShowScreenshotOsd(dlg.FileName);
         }
     }
 
@@ -1314,6 +2552,10 @@ public partial class MainWindow : Window, IPlaybackObserver
         WindowBoundsStore.Persist(this);
         PersistVolumePrefs();
         PersistThemePrefs();
+        PersistChromePinPrefs();
+        PersistPlaylistPanelPrefs();
+        PersistTopmostPrefs();
+        PersistPlaylistPrefs();
         PersistResume();
         _positionTimer.Stop();
         _autoHideTimer.Stop();
