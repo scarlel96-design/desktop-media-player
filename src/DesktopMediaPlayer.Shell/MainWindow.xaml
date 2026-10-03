@@ -94,8 +94,9 @@
 
           <DockPanel Grid.Row="2" LastChildFill="False">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
-              <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
-                      Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
+              <Button x:Name="OpenButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Open}" ToolTip="Open"
+                      AutomationProperties.Name="Open" Click="Open_Click"/>
               <Border Style="{StaticResource ChromeDivider}"/>
               <Button x:Name="PrevButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
                       Content="{DynamicResource Lumen.Icon.Prev}" ToolTip="Previous (stop at ends)"
@@ -113,10 +114,12 @@
                       Content="{DynamicResource Lumen.Icon.Next}" ToolTip="Next (stop at ends)"
                       AutomationProperties.Name="Next" Click="Next_Click" IsEnabled="False"/>
               <Border Style="{StaticResource ChromeDivider}"/>
-              <Button x:Name="FrameBackButton" Style="{StaticResource TransportButton}"
-                      Content="⏮|" ToolTip="Frame back" Click="FrameBack_Click"/>
-              <Button x:Name="FrameStepButton" Style="{StaticResource TransportButton}"
-                      Content="|⏭" ToolTip="Frame step" Click="FrameStep_Click"/>
+              <Button x:Name="FrameBackButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.FrameBack}" ToolTip="Frame back"
+                      AutomationProperties.Name="Frame back" Click="FrameBack_Click"/>
+              <Button x:Name="FrameStepButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.FrameStep}" ToolTip="Frame step"
+                      AutomationProperties.Name="Frame step" Click="FrameStep_Click"/>
               <Border Style="{StaticResource ChromeDivider}"/>
             </StackPanel>
 
