@@ -102,4 +102,75 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <!-- Lumen P4-3: icon button templates (unapplied; consumers added in a later Atomic). -->
+  <Style x:Key="LumenIconButton" TargetType="Button">
+    <Setter Property="OverridesDefaultStyle" Value="True"/>
+    <Setter Property="Width" Value="{DynamicResource Lumen.Size.Hit}"/>
+    <Setter Property="Height" Value="{DynamicResource Lumen.Size.Hit}"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Foreground" Value="{DynamicResource Lumen.Text.SecondaryBrush}"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Face" Background="Transparent" CornerRadius="{DynamicResource Lumen.Radius.Control}">
+            <Path x:Name="Icon" Data="{TemplateBinding Content}"
+                  Fill="{TemplateBinding Foreground}" Stroke="{TemplateBinding Foreground}"
+                  StrokeThickness="1.5" StrokeLineJoin="Round" Stretch="None"
+                  Width="{DynamicResource Lumen.Size.Icon}" Height="{DynamicResource Lumen.Size.Icon}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Face" Property="Background" Value="{DynamicResource Lumen.State.HoverOverlayBrush}"/>
+              <Setter TargetName="Icon" Property="Fill" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+              <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Face" Property="Background" Value="{DynamicResource Lumen.State.PressedOverlayBrush}"/>
+              <Setter TargetName="Icon" Property="Fill" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+              <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Face" Property="Background" Value="Transparent"/>
+              <Setter TargetName="Icon" Property="Fill" Value="{DynamicResource Lumen.Icon.DisabledBrush}"/>
+              <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Lumen.Icon.DisabledBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="LumenPrimaryIconButton" TargetType="Button" BasedOn="{StaticResource LumenIconButton}">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Face" Background="{DynamicResource Lumen.State.HoverOverlayBrush}" CornerRadius="20">
+            <Path x:Name="Icon" Data="{TemplateBinding Content}"
+                  Fill="{TemplateBinding Foreground}" Stroke="{TemplateBinding Foreground}"
+                  StrokeThickness="1.5" StrokeLineJoin="Round" Stretch="None"
+                  Width="{DynamicResource Lumen.Size.Icon}" Height="{DynamicResource Lumen.Size.Icon}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Face" Property="Background" Value="{DynamicResource Lumen.State.PressedOverlayBrush}"/>
+              <Setter TargetName="Icon" Property="Fill" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+              <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Face" Property="Background" Value="{DynamicResource Lumen.State.PressedOverlayBrush}"/>
+              <Setter TargetName="Icon" Property="Fill" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+              <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Face" Property="Background" Value="Transparent"/>
+              <Setter TargetName="Icon" Property="Fill" Value="{DynamicResource Lumen.Icon.DisabledBrush}"/>
+              <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource Lumen.Icon.DisabledBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
 </ResourceDictionary>
