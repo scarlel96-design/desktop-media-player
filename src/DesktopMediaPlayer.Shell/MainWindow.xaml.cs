@@ -2403,7 +2403,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             }
 
             var playing = state == PlaybackState.Playing;
-            PlayButton.Content = playing ? "⏸" : "▶";
+            if (TryFindResource(playing ? "Lumen.Icon.Pause" : "Lumen.Icon.Play") is Geometry icon) PlayButton.Content = icon;
             PlayButton.ToolTip = playing ? "Pause" : "Play";
             RefreshTransportEnabled();
             RefreshPlaylistUi();

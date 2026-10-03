@@ -97,18 +97,21 @@
               <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
                       Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
               <Border Style="{StaticResource ChromeDivider}"/>
-              <Button x:Name="PrevButton" Style="{StaticResource TransportButton}"
-                      Content="⏮" ToolTip="Previous (stop at ends)"
-                      Click="Prev_Click" IsEnabled="False"/>
-              <Button x:Name="PlayButton" Style="{StaticResource TransportButton}"
-                      Content="▶" ToolTip="Play" Click="PlayPause_Click"/>
-              <Button x:Name="PauseButton" Style="{StaticResource TransportButton}"
-                      Content="⏸" ToolTip="Pause" Click="Pause_Click" Visibility="Collapsed"/>
-              <Button x:Name="StopButton" Style="{StaticResource TransportButton}"
-                      Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
-              <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
-                      Content="⏭" ToolTip="Next (stop at ends)"
-                      Click="Next_Click" IsEnabled="False"/>
+              <Button x:Name="PrevButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Prev}" ToolTip="Previous (stop at ends)"
+                      AutomationProperties.Name="Previous" Click="Prev_Click" IsEnabled="False"/>
+              <Button x:Name="PlayButton" Style="{StaticResource LumenPrimaryIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Play}" ToolTip="Play"
+                      AutomationProperties.Name="Play/Pause" Click="PlayPause_Click"/>
+              <Button x:Name="PauseButton" Style="{StaticResource LumenPrimaryIconButton}"
+                      Content="{DynamicResource Lumen.Icon.Pause}" ToolTip="Pause"
+                      AutomationProperties.Name="Pause" Click="Pause_Click" Visibility="Collapsed"/>
+              <Button x:Name="StopButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Stop}" ToolTip="Stop"
+                      AutomationProperties.Name="Stop" Click="Stop_Click"/>
+              <Button x:Name="NextButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Next}" ToolTip="Next (stop at ends)"
+                      AutomationProperties.Name="Next" Click="Next_Click" IsEnabled="False"/>
               <Border Style="{StaticResource ChromeDivider}"/>
               <Button x:Name="FrameBackButton" Style="{StaticResource TransportButton}"
                       Content="⏮|" ToolTip="Frame back" Click="FrameBack_Click"/>
