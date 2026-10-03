@@ -1058,7 +1058,7 @@ public partial class MainWindow : Window, IPlaybackObserver
     private void RefreshMuteGlyph()
     {
         var muted = _muteUi || VolumeSlider.Value <= 0;
-        MuteButton.Content = muted ? "🔇" : "🔊";
+        if (TryFindResource(muted ? "Lumen.Icon.VolumeOff" : "Lumen.Icon.VolumeOn") is Geometry icon) MuteButton.Content = icon;
         MuteButton.ToolTip = muted ? "Unmute" : "Mute";
     }
 

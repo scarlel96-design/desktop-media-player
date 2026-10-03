@@ -123,13 +123,15 @@
             <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
                         DockPanel.Dock="Left" Margin="0,0,16,0"
                         PreviewMouseWheel="VolumeGroup_PreviewMouseWheel">
-              <Button x:Name="MuteButton" Style="{StaticResource TransportButton}"
-                      Content="🔊" ToolTip="Mute" Click="Mute_Click"/>
+              <Button x:Name="MuteButton" Style="{StaticResource LumenIconButton}"
+                      Content="{DynamicResource Lumen.Icon.VolumeOn}" AutomationProperties.Name="Mute"
+                      Margin="0,0,8,0" ToolTip="Mute" Click="Mute_Click"/>
               <Slider x:Name="VolumeSlider"
                       Width="96" MinWidth="88" MaxWidth="104"
                       Minimum="0" Maximum="100" Value="80"
                       VerticalAlignment="Center"
                       TickFrequency="1" IsSnapToTickEnabled="True"
+                      IsMoveToPointEnabled="True"
                       ValueChanged="VolumeSlider_ValueChanged"
                       ToolTip="Volume"/>
             </StackPanel>
