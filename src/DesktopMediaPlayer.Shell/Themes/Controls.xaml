@@ -19,6 +19,16 @@
     <Setter Property="VerticalAlignment" Value="Center"/>
     <Setter Property="Foreground" Value="{DynamicResource Lumen.Text.SecondaryBrush}"/>
   </Style>
+  <Style x:Key="ChromeTimeLabel" TargetType="TextBlock" BasedOn="{StaticResource ChromeCaption}">
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="--:--">
+        <Setter Property="Foreground" Value="{DynamicResource Lumen.Text.TertiaryBrush}"/>
+      </DataTrigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="ChromeTimeCurrent" TargetType="TextBlock" BasedOn="{StaticResource ChromeTimeLabel}">
+    <Setter Property="Foreground" Value="{DynamicResource Lumen.Text.PrimaryBrush}"/>
+  </Style>
   <Style x:Key="SidePanel" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource Lumen.Legacy.FlyoutBgBrush}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource Lumen.Legacy.ButtonBorderBrush}"/>

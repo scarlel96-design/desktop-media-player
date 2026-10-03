@@ -65,7 +65,7 @@
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="CurrentTimeText" Grid.Column="0"
-                       Style="{StaticResource ChromeCaption}"
+                       Style="{StaticResource ChromeTimeCurrent}"
                        Text="--:--" Margin="0,0,12,0" MinWidth="{StaticResource Lumen.Size.TimeLabelMinWidth}" TextAlignment="Right"/>
             <Grid Grid.Column="1" MinHeight="24" VerticalAlignment="Center"
                   MouseMove="SeekArea_MouseMove" MouseLeave="SeekArea_MouseLeave">
@@ -88,7 +88,7 @@
               </Popup>
             </Grid>
             <TextBlock x:Name="TotalTimeText" Grid.Column="2"
-                       Style="{StaticResource ChromeCaption}"
+                       Style="{StaticResource ChromeTimeLabel}"
                        Text="--:--" Margin="12,0,0,0" MinWidth="{StaticResource Lumen.Size.TimeLabelMinWidth}"/>
           </Grid>
 
