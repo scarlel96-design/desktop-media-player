@@ -6,6 +6,7 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Themes/Lumen.Tokens.Shared.xaml" />
+        <ResourceDictionary Source="Themes/Lumen.Icons.xaml" />
         <ResourceDictionary Source="Themes/Controls.xaml" />
         <ResourceDictionary Source="Themes/Lumen.Colors.Dark.xaml" />
       </ResourceDictionary.MergedDictionaries>
