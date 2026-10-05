@@ -8,12 +8,23 @@
 | 기준 | Canonical Soft tip `96b9175129bd1b75bc2a75501178411960d6f3b4` (S97 Soft Closed, BLD-20261002-PHASEA-S97-001). 이 문서로 tip은 움직이지 않는다. |
 | 상태 한계 | Windows NOT TESTED · WPF render NOT TESTED · Visual PASS NOT EVALUATED · Portable SKIPPED · CI GREEN 미주장 · Soft≠Windows PASS · KI-022/024 WINDOWS PENDING |
 
-투자자 봇 의견은 외부 독립 의견이며 Gate 승인이나 개발 명령이 아니다. 아래는 총괄이 전달한 회신 요지를 항목별로 기록한 것이다. 회신 판정 라벨(ACCEPT/PARTIAL ACCEPT/REJECT)은 총괄이 따로 지정한 것이 비서에게 전달되지 않았으므로 이 문서에 쓰지 않는다(UNKNOWN). 총괄이 지정하면 추가 기록한다.
+투자자 봇 의견은 외부 독립 의견이며 Gate 승인이나 개발 명령이 아니다. 아래는 총괄이 전달한 회신 요지를 항목별로 기록한 것이다. 회신 판정 라벨은 총괄이 2026-10-05 ~10:08 KST에 추가로 지정했고 아래 "판정 라벨"에 기록한다(첫 기록 시점에는 UNKNOWN이었으며, 이 문단은 그 정정이다).
+
+## 판정 라벨 (총괄 2026-10-05 ~10:08 KST)
+
+| 요청 | 판정 | 비고 |
+|---|---|---|
+| 1) frame-drop 일정 | ACCEPT | |
+| 2) 12항목 gap table | PARTIAL ACCEPT | 표는 존재하나 GitHub 미게시였음. 이번에 게시(`docs/records-20261005`). |
+| 3) S78~S97 중요 Windows 검증 | ACCEPT | |
+| 4) Closure/Merge·README·CI 문서 초안 | ACCEPT | 문서만. 워크플로 파일 추가는 별도 Atomic. |
+
+우선순위 변경(총괄): S97 Windows 결과 후 회귀 수정 → 그다음 frame-drop 옵션 1개 Atomic. 그동안 신규 Lumen UI LOCK 없음. 아래 항목 1의 "frame-drop 최우선" 표현은 이 순서로 정정된다(회귀 수정이 frame-drop 옵션 Atomic보다 앞선다).
 
 ## Escalation 4건에 대한 총괄 회신 요지
 
 1. **frame-drop(KI-027, HIGH-RISK HOLD)**
-   - S97 Windows 점검 결과를 받은 뒤, frame-drop 원인 확인/완화 옵션 1개를 Atomic으로 최우선 진행한다.
+   - S97 Windows 점검 결과를 받은 뒤, frame-drop 원인 확인/완화 옵션 1개를 Atomic으로 진행한다(순서는 위 "우선순위 변경" 참조).
    - 옵션 비교 문서는 `docs/engineering/FRAME-DROP-OPTION-COMPARISON-20261003.md`에 있다(문서 전용, 모든 효과는 가설이며 Windows NOT TESTED).
    - 원인은 현재 미확정이다. 근본 원인이나 수정 커밋은 아직 없다.
 
