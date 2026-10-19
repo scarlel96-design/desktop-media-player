@@ -559,6 +559,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
         MpvNative.mpv_set_option_string(_mpv, "vo", "gpu-next,gpu");
+        // S100 frame-drop: cheaper downscale filter for oversized video (timing/queue unchanged).
+        MpvNative.mpv_set_option_string(_mpv, "dscale", "bilinear");
         MpvNative.mpv_set_option_string(_mpv, "gpu-context", HardwareAccelPolicy.GpuContext);
         MpvNative.mpv_set_option_string(_mpv, "keep-open", "yes");
         MpvNative.mpv_set_option_string(_mpv, "osc", "no");
