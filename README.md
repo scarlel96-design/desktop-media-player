@@ -41,6 +41,8 @@ Shell copies `native/win-x64/*` to output **only when files exist**.
 
 ## Build
 
+Requirements: .NET Desktop Runtime 10.0.13 이상 (x64) on Windows.
+
 ```powershell
 dotnet restore DesktopMediaPlayer.sln
 dotnet build DesktopMediaPlayer.sln -c Release -p:Platform=x64
