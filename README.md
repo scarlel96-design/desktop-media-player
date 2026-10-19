@@ -42,6 +42,7 @@ Shell copies `native/win-x64/*` to output **only when files exist**.
 ## Build
 
 Requirements: .NET Desktop Runtime 10.0.13 이상 (x64) on Windows.
+Build SDK: .NET SDK 10.0.402 (pinned by global.json, rollForward latestPatch).
 
 ```powershell
 dotnet restore DesktopMediaPlayer.sln
