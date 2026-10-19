@@ -17,6 +17,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private readonly AutoResetEvent _wake = new(false);
     private readonly CancellationTokenSource _cts = new();
     private readonly object _stateGate = new();
+    // S104 C2: serializes UI-thread handle reads with DestroyMpv handle release.
+    private readonly object _handleGate = new();
     private readonly SynchronizationContext? _sync;
 
     private Thread? _thread;
@@ -241,7 +243,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Check(MpvNative.mpv_set_property_string(_mpv, "mute", mute ? "yes" : "no"), "mute");
     });
 
-    public bool GetMute()
+    public bool GetMute() { lock (_handleGate) { return GetMuteCore(); } }
+
+    private bool GetMuteCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -253,7 +257,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return string.Equals(v, "yes", StringComparison.OrdinalIgnoreCase);
     }
 
-    public double GetPosition()
+    public double GetPosition() { lock (_handleGate) { return GetPositionCore(); } }
+
+    private double GetPositionCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -264,7 +270,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
     }
 
-    public double GetDuration()
+    public double GetDuration() { lock (_handleGate) { return GetDurationCore(); } }
+
+    private double GetDurationCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -275,7 +283,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
     }
 
-    public double GetBufferedEndSeconds()
+    public double GetBufferedEndSeconds() { lock (_handleGate) { return GetBufferedEndSecondsCore(); } }
+
+    private double GetBufferedEndSecondsCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -317,7 +327,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     }
 
 
-    public IReadOnlyList<MediaTrackInfo> ListTracks()
+    public IReadOnlyList<MediaTrackInfo> ListTracks() { lock (_handleGate) { return ListTracksCore(); } }
+
+    private IReadOnlyList<MediaTrackInfo> ListTracksCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -421,7 +433,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     });
 
 
-    public MediaInfoBasics GetMediaInfo()
+    public MediaInfoBasics GetMediaInfo() { lock (_handleGate) { return GetMediaInfoCore(); } }
+
+    private MediaInfoBasics GetMediaInfoCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -996,7 +1010,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private void DestroyMpv()
     {
         // S102: atomically take ownership so only one caller destroys the handle.
-        var h = Interlocked.Exchange(ref _mpv, nint.Zero);
+        // S104: take the handle under _handleGate so no getter is mid-call; destroy outside the lock (no UI-thread wait).
+        nint h;
+        lock (_handleGate)
+        {
+            h = Interlocked.Exchange(ref _mpv, nint.Zero);
+        }
         if (h == nint.Zero)
         {
             return;
