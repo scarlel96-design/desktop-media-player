@@ -282,6 +282,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return 0;
         }
 
+        // S98 KI-030: local file (demuxer-via-network=no) has no meaningful network buffer.
+        // Query failure (null/unknown) keeps existing behavior; never assume local.
+        var viaNetwork = MpvNative.GetPropertyAndFree(_mpv, "demuxer-via-network");
+        if (string.Equals(viaNetwork, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
         static double Parse(string? s) =>
             double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
 
