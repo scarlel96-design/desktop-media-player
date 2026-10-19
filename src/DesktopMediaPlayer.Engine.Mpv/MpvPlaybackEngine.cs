@@ -657,8 +657,17 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
                 break;
             case MpvEventIds.EndFile:
-                LogEndFile(evt.data);
-                SetState(PlaybackState.Ended);
+                // S103: map END_FILE by reason; error -> Error, eof/unknown -> Ended, stop/quit/redirect keep state.
+                var end = LogEndFile(evt.data);
+                if (end is { reason: 4 } failed)
+                {
+                    RaiseError("playback.end_error", MpvNative.GetErrorString(failed.error), recoverable: true);
+                    SetState(PlaybackState.Error);
+                }
+                else if (end is null || end.Value.reason is not (2 or 3 or 5))
+                {
+                    SetState(PlaybackState.Ended);
+                }
                 break;
             case MpvEventIds.VideoReconfig:
                 MaybeFirstFrame();
@@ -738,11 +747,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _logger.Log("info", "mpv_event", $"id={id} name={name} state={_state}");
     }
 
-    private void LogEndFile(nint data)
+    private MpvEventEndFile? LogEndFile(nint data)
     {
         if (data == nint.Zero)
         {
-            return;
+            return null;
         }
         var end = Marshal.PtrToStructure<MpvEventEndFile>(data);
         var name = end.reason switch
@@ -755,6 +764,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             _ => "unknown",
         };
         _logger.Log(end.reason == 4 ? "warn" : "info", "end_file", $"reason={name}({end.reason}) error={end.error} state={_state}");
+        return end;
     }
 
     private void LogSeekLatency()
