@@ -1,6 +1,6 @@
 # Known Issues — KI-2026-09-05-043
 
-| Updated | 2026-09-05 04:58 KST |
+| Updated | 2026-10-20 02:30 KST (이전 헤더 2026-09-05 04:58 KST, 이력 보존) |
 
 | ID | Sev | Issue | Status |
 |----|-----|-------|--------|
@@ -123,3 +123,20 @@ ORANGE 18% · ΔR −10pp/~12m · Missed +2m · hard freeze · RED≤5% SAFE STO
 - **KI-027** frame-drop 10~20/s — decoder-drop 0, vo-drop 0, hwdec d3d11va, vo=gpu-next, container 60.0 / display 59.95 fps. 카운터는 pause→play·seek 시 0으로 초기화(delta 음수). 원인 미확정(H1~H3는 수석 가설, 원문 미수령). 고위험 Open.
 - **KI-028** F1 스페이스바 → 포커스 버튼 동작 — 대상 S76(미LOCK).
 - **KI-029** F2 전체화면 하단 레터박스 — 대상 S77(미LOCK).
+
+## 2026-10-20 ~02:30 KST 갱신 (총괄 판정)
+- **KI-030** 재생바에 버퍼링 바처럼 보이는 표시가 있으나, 그 지점 너머를 눌러도 실제 버퍼링은 없음. 시각적 오표시 의심, 재생 영향 없음. 분류 Core UI·UX, 심각도 Low. 상태 OPEN, 수석이 원인 분석 중. 출처: 사용자 S97 Windows 점검 구두 보고(2026-10-20, 로그 없음). 번호 근거: KNOWN_ISSUES와 SoT 전체 검색 결과 사용 중인 최대 번호 KI-029, KI-030 중복 없음.
+- **KI-022 / KI-024** 닫지 않음. 상태: OPEN (fix in Soft, Windows 미검증). S97 점검 5항목 PASS(사용자 관찰)는 이 KI의 재현 시나리오를 Windows에서 직접 확인한 증거가 아님(Soft≠Windows PASS). 수석에게 종료 근거 확인 요청.
+- **KI-026 / KI-028 / KI-029** 현행 목록에 포함(위 "KI-025~029 등록" 절). Soft에서 고친 기록이 있더라도 Windows 미검증이라 OPEN.
+- **KI-027 frame-drop 수치: 출처별 불일치.** 측정값은 frame-drop Atomic에서 다시 잡는다.
+
+| 출처 | 기재 수치 |
+|---|---|
+| KNOWN_ISSUES KI-027 (S72 로그 기준) | 10~20/s |
+| S71 Windows 로그 기록 (총괄 전달) | 약 14~20/s |
+| README 초안 S71 | 약 14~26/s |
+| CONTINUITY-STATUS-NOW | 18~26/s |
+| WINDOWS-RESULT S87/S80 (총괄 기록) | 약 20~25/s |
+| README 범위 정렬 초안 (수석) | 7.8~22.3/s |
+
+불일치 — 어느 값도 확정 아님.
