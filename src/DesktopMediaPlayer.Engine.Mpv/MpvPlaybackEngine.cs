@@ -457,7 +457,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _wake.Set();
         if (_thread is { IsAlive: true } && Thread.CurrentThread != _thread)
         {
-            _thread.Join(TimeSpan.FromSeconds(3));
+            if (!_thread.Join(TimeSpan.FromSeconds(3)))
+            {
+                // S102: event thread still alive; skip native destroy and handle disposal to avoid use-after-free.
+                _logger.Log("warn", "dispose_join_timeout", "event thread did not exit within 3s; skipped DestroyMpv");
+                return;
+            }
         }
 
         DestroyMpv();
@@ -980,21 +985,21 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     private void DestroyMpv()
     {
-        if (_mpv == nint.Zero)
+        // S102: atomically take ownership so only one caller destroys the handle.
+        var h = Interlocked.Exchange(ref _mpv, nint.Zero);
+        if (h == nint.Zero)
         {
             return;
         }
 
         try
         {
-            MpvNative.mpv_terminate_destroy(_mpv);
+            MpvNative.mpv_terminate_destroy(h);
         }
         catch
         {
             // Best-effort shutdown.
         }
-
-        _mpv = nint.Zero;
     }
 }
 
