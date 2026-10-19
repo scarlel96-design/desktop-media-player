@@ -27,7 +27,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private PlaybackState _state = PlaybackState.Idle;
     private bool _firstFrameRaised;
     private long _seekRequestTs; // RV-01 Soft: Stopwatch ticks of pending seek request; 0 = none.
-    private bool _disposed;
+    private volatile bool _disposed;
+    private int _disposeFlag; // S105: atomic Dispose entry guard
     private string? _pendingOpen;
     private int _volume = 100;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
@@ -461,7 +462,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposeFlag, 1) != 0)
         {
             return;
         }
