@@ -60,9 +60,10 @@ public partial class App : Application
         {
             Facade?.Dispose();
         }
-        catch
+        catch (Exception ex)
         {
             // ignore
+            Logger?.Log("warn", "facade_dispose_exception", $"{ex.GetType().Name}: {ex.Message}");
         }
 
         try
