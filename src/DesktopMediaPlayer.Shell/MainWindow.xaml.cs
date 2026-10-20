@@ -751,9 +751,10 @@ public partial class MainWindow : Window, IPlaybackObserver
                 title = _facade.GetMediaInfo().Title;
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Soft ignore GetMediaInfo failures.
+            (Application.Current as App)?.Logger?.Log("warn", "media_info_read_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
 
         if (string.IsNullOrWhiteSpace(title))
