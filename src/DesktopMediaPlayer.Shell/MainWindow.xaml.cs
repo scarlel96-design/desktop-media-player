@@ -313,9 +313,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             _facade.LoadExternalSubtitle(path);
             PopulateTrackList(MediaTrackKind.Subtitle);
         }
-        catch
+        catch (Exception ex)
         {
             // Soft no-op.
+            (Application.Current as App)?.Logger?.Log("warn", "subtitle_drop_load_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
     }
 
