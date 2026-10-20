@@ -991,9 +991,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             {
                 call(observer);
             }
-            catch
+            catch (Exception ex)
             {
                 // Observer must not kill the engine thread.
+                _logger.Log("warn", "observer_exception", $"{ex.GetType().Name}: {ex.Message}");
             }
         }
 
