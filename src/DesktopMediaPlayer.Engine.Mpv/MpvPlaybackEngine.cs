@@ -505,7 +505,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         ObjectDisposedException.ThrowIf(_disposed, this);
         EnsureThread();
         _queue.Enqueue(action);
-        _wake.Set();
+        try
+        {
+            _wake.Set();
+        }
+        catch (ObjectDisposedException)
+        {
+            // S106: Dispose raced after ThrowIf; engine is shutting down, drop the wake.
+        }
     }
 
     private void EngineLoop()
