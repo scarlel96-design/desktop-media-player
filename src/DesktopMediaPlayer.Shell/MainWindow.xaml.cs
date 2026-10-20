@@ -874,9 +874,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             _facade.SetSubtitleOffset(0);
             ShowSubtitleOffsetOsd();
         }
-        catch
+        catch (Exception ex)
         {
             // Soft no-op.
+            (Application.Current as App)?.Logger?.Log("warn", "subtitle_offset_reset_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
     }
 
