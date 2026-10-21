@@ -1949,9 +1949,10 @@ public partial class MainWindow : Window, IPlaybackObserver
                     LastOpenDirectoryPrefsStore.Persist(dir);
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // Soft ignore path/IO failures.
+                (Application.Current as App)?.Logger?.Log("warn", "last_open_dir_persist_failed", $"{ex.GetType().Name}: {ex.Message}");
             }
 
             _facade.LoadExternalSubtitle(dlg.FileName);
