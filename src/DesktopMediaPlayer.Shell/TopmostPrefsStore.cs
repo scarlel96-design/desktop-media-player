@@ -42,8 +42,9 @@ internal static class TopmostPrefsStore
             topmost = dto.Topmost;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"TopmostPrefsStore: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -55,8 +56,9 @@ internal static class TopmostPrefsStore
             var dto = new PrefsDto(topmost);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"TopmostPrefsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }
