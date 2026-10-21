@@ -44,8 +44,9 @@ internal static class VolumePrefsStore
             mute = dto.Mute;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"VolumePrefsStore: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -57,8 +58,9 @@ internal static class VolumePrefsStore
             var dto = new PrefsDto(Math.Clamp(volume, 0, 100), mute);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"VolumePrefsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }
