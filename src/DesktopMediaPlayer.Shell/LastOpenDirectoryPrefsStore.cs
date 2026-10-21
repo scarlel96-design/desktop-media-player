@@ -42,8 +42,9 @@ internal static class LastOpenDirectoryPrefsStore
             directory = dto.Directory;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"LastOpenDirectoryPrefsStore: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -60,8 +61,9 @@ internal static class LastOpenDirectoryPrefsStore
             var dto = new PrefsDto(directory);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"LastOpenDirectoryPrefsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }
