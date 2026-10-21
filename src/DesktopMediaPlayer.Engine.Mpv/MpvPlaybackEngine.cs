@@ -1034,8 +1034,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         {
             MpvNative.mpv_terminate_destroy(h);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Log("warn", "mpv_destroy_failed", $"{ex.GetType().Name}: {ex.Message}");
             // Best-effort shutdown.
         }
     }
