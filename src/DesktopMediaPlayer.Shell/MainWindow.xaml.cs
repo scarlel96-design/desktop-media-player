@@ -2111,8 +2111,9 @@ public partial class MainWindow : Window, IPlaybackObserver
             var value = key?.GetValue("AppsUseLightTheme");
             return value is int i && i == 1;
         }
-        catch
+        catch (Exception ex)
         {
+            (Application.Current as App)?.Logger?.Log("warn", "system_theme_read_failed", $"{ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
