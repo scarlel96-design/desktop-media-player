@@ -918,9 +918,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch
+        catch (Exception ex)
         {
             // Soft ignore explorer launch failures.
+            (Application.Current as App)?.Logger?.Log("warn", "explorer_launch_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
     }
 
