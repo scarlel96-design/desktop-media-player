@@ -44,8 +44,9 @@ internal static class PlaylistPrefsStore
             currentIndex = dto.CurrentIndex;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"PlaylistPrefsStore: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -61,8 +62,9 @@ internal static class PlaylistPrefsStore
             var dto = new PrefsDto(list, idx);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"PlaylistPrefsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }
