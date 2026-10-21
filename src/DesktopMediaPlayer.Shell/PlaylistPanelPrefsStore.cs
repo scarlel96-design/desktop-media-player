@@ -42,8 +42,9 @@ internal static class PlaylistPanelPrefsStore
             open = dto.Open;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"PlaylistPanelPrefsStore: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -55,8 +56,9 @@ internal static class PlaylistPanelPrefsStore
             var dto = new PrefsDto(open);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"PlaylistPanelPrefsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }
