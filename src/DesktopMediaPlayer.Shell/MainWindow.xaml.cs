@@ -651,9 +651,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch
+        catch (Exception ex)
         {
             // Soft ignore clipboard failures.
+            (Application.Current as App)?.Logger?.Log("warn", "clipboard_copy_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
     }
 
