@@ -2391,8 +2391,9 @@ public partial class MainWindow : Window, IPlaybackObserver
                 Title = $"{name} - Desktop Media Player";
             }
         }
-        catch
+        catch (Exception ex)
         {
+            (Application.Current as App)?.Logger?.Log("warn", "window_title_update_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
     }
 
