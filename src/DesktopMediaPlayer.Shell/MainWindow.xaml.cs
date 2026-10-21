@@ -2570,9 +2570,10 @@ public partial class MainWindow : Window, IPlaybackObserver
             _facade?.RenderHost?.Detach();
             _facade?.RemoveObserver(this);
         }
-        catch
+        catch (Exception ex)
         {
             // ignore
+            (Application.Current as App)?.Logger?.Log("warn", "window_teardown_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
 
         base.OnClosed(e);
