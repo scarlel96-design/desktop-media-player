@@ -36,7 +36,7 @@ public partial class App : Application
         Facade.RenderHost = Engine.RenderHost;
         Engine.Observer = Facade;
         Playlist = new MinimalPlaylistService(Facade);
-        ResumeStore = new FileResumeStore();
+        ResumeStore = new FileResumeStore(Logger);
     }
 
     internal void ApplyColorTheme(bool dark)
