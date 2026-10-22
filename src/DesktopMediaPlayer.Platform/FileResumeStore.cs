@@ -12,9 +12,11 @@ public sealed class FileResumeStore : IResumeStore
     private readonly string _filePath;
     private readonly ConcurrentDictionary<string, double> _map = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _io = new();
+    private readonly SpikeLogger? _logger;
 
-    public FileResumeStore()
+    public FileResumeStore(SpikeLogger? logger = null)
     {
+        _logger = logger;
         var dir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "desktop-media-player");
@@ -75,8 +77,9 @@ public sealed class FileResumeStore : IResumeStore
                 _map[kv.Key] = kv.Value;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.Log("warn", "resume_load_failed", $"FileResumeStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore corrupt resume store.
         }
     }
@@ -91,8 +94,9 @@ public sealed class FileResumeStore : IResumeStore
                 var json = JsonSerializer.Serialize(snapshot);
                 File.WriteAllText(_filePath, json);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger?.Log("warn", "resume_persist_failed", $"FileResumeStore: {ex.GetType().Name}: {ex.Message}");
                 // Best-effort.
             }
         }

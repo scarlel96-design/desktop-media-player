@@ -47,8 +47,9 @@ internal static class ThemePrefsStore
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"ThemePrefsStore: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -60,8 +61,9 @@ internal static class ThemePrefsStore
             var dto = new PrefsDto(theme.ToString());
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"ThemePrefsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }

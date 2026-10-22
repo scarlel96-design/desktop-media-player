@@ -1,8 +1,8 @@
-# desktop-media-player (Step 0 tech spike)
+# desktop-media-player
 
-WPF + libmpv playback spike for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
+WPF + libmpv desktop media player for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
 
-**Status: Step 0 PASS WITH KI · Phase A in progress (S0 Contracts/Facade).**
+**Status: Phase A Soft canonical e099c2e (BLD-20261021-PHASEA-S132-001). Windows high-risk check 2026-10-22: KI-030 and shutdown PASS, KI-031 Low (cause NOT VERIFIED). See KNOWN_ISSUES.**
 
 ## Layers
 
@@ -10,18 +10,18 @@ WPF + libmpv playback spike for Windows **win-x64** on **.NET 10** (`net10.0-win
 |---------|------|
 | `DesktopMediaPlayer.Contracts` | Frozen `IPlaybackEngine`, `IPlaybackObserver`, `IRenderHost`, `PlaybackState` |
 | `DesktopMediaPlayer.Platform` | `SpikeLogger`, `HardwareAccelPolicy` (D3D11VA → copy → software) |
-| `DesktopMediaPlayer.Playback` | `PlaybackFacade` — volume clamp, observer fan-out, path validation |
+| `DesktopMediaPlayer.Playback` | `PlaybackFacade` — volume clamp, observer fan-out, path validation; `MinimalPlaylistService` — playlist service |
 | `DesktopMediaPlayer.Engine.Mpv` | libmpv P/Invoke, engine thread, `MpvPlaybackEngine`, `MpvRenderHost` |
 | `DesktopMediaPlayer.Shell` | WPF UI, `VideoHwndHost`, PerMonitorV2 DPI; **no** mpv DllImport |
 | `DesktopMediaPlayer.Playback.Tests` | Facade unit tests (no native DLL) |
 
 UI talks **only** to `PlaybackFacade` (`IPlaybackEngine`). Shell never P/Invokes libmpv.
 
-## Spike vs MVP
+## Implemented scope
 
-**Spike (this repo):** open local file, play/pause/stop/seek/volume, HWND embed, DPI physical-pixel resize, hwdec policy logging, missing-DLL graceful error.
+**Implemented (this repo):** open local file, play/pause/stop/seek/volume, HWND embed, DPI physical-pixel resize, hwdec policy logging, missing-DLL graceful error, playlist, resume (playback position), themes, subtitles (external subtitle load), screenshot, OSD, copy to clipboard (path/name/folder/title), always-on-top.
 
-**Not in spike:** playlist, resume, themes, subtitle UI, installer, auto-update, packaging of binaries in git.
+**Not implemented:** Blur/Acrylic, P1 features, installer, auto-update, packaging of binaries in git.
 
 ## LGPL / dynamic-link note
 
@@ -40,6 +40,9 @@ Load order:
 Shell copies `native/win-x64/*` to output **only when files exist**.
 
 ## Build
+
+Requirements: .NET Desktop Runtime 10.0.13 이상 (x64) on Windows.
+Build SDK: .NET SDK 10.0.402 (pinned by global.json, rollForward latestPatch).
 
 ```powershell
 dotnet restore DesktopMediaPlayer.sln

@@ -57,8 +57,9 @@ internal static class WindowBoundsStore
                 window.WindowState = state;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"WindowBoundsStore: {ex.GetType().Name}: {ex.Message}");
             // Corrupt bounds file — keep defaults.
         }
     }
@@ -87,8 +88,9 @@ internal static class WindowBoundsStore
             var dto = new BoundsDto(left, top, width, height, window.WindowState.ToString());
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOptions));
         }
-        catch
+        catch (Exception ex)
         {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_persist_failed", $"WindowBoundsStore: {ex.GetType().Name}: {ex.Message}");
             // Ignore IO failures.
         }
     }

@@ -17,6 +17,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private readonly AutoResetEvent _wake = new(false);
     private readonly CancellationTokenSource _cts = new();
     private readonly object _stateGate = new();
+    // S104 C2: serializes UI-thread handle reads with DestroyMpv handle release.
+    private readonly object _handleGate = new();
     private readonly SynchronizationContext? _sync;
 
     private Thread? _thread;
@@ -24,11 +26,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private nint _wid;
     private PlaybackState _state = PlaybackState.Idle;
     private bool _firstFrameRaised;
-    private bool _disposed;
+    private long _seekRequestTs; // RV-01 Soft: Stopwatch ticks of pending seek request; 0 = none.
+    private volatile bool _disposed;
+    private int _disposeFlag; // S105: atomic Dispose entry guard
     private string? _pendingOpen;
     private int _volume = 100;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
+    private const int SeekSlowMs = 1000;
 
     // KI-014 Soft: absolute drop counters + Δrate between samples (≠ perceived stutter).
     private long? _prevFrameDrop;
@@ -65,6 +70,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     {
         _pendingOpen = path;
         _firstFrameRaised = false;
+        _seekRequestTs = 0;
         ResetDropBaselines();
         SetState(PlaybackState.Opening);
         _logger.Open(path);
@@ -119,6 +125,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public void Stop() => Post(() =>
     {
+        _seekRequestTs = 0;
         if (_mpv == nint.Zero)
         {
             return;
@@ -136,7 +143,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         var cmd = string.Create(CultureInfo.InvariantCulture, $"seek {seconds} absolute");
-        Check(MpvNative.mpv_command_string(_mpv, cmd), "seek");
+        var rc = MpvNative.mpv_command_string(_mpv, cmd);
+        Check(rc, "seek");
+        if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
+        {
+            _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
     });
 
     public void SetVolume(int volume) => Post(() =>
@@ -232,7 +244,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Check(MpvNative.mpv_set_property_string(_mpv, "mute", mute ? "yes" : "no"), "mute");
     });
 
-    public bool GetMute()
+    public bool GetMute() { lock (_handleGate) { return GetMuteCore(); } }
+
+    private bool GetMuteCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -244,7 +258,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return string.Equals(v, "yes", StringComparison.OrdinalIgnoreCase);
     }
 
-    public double GetPosition()
+    public double GetPosition() { lock (_handleGate) { return GetPositionCore(); } }
+
+    private double GetPositionCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -255,7 +271,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
     }
 
-    public double GetDuration()
+    public double GetDuration() { lock (_handleGate) { return GetDurationCore(); } }
+
+    private double GetDurationCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -266,9 +284,19 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         return double.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
     }
 
-    public double GetBufferedEndSeconds()
+    public double GetBufferedEndSeconds() { lock (_handleGate) { return GetBufferedEndSecondsCore(); } }
+
+    private double GetBufferedEndSecondsCore()
     {
         if (_mpv == nint.Zero)
+        {
+            return 0;
+        }
+
+        // S98 KI-030: local file (demuxer-via-network=no) has no meaningful network buffer.
+        // Query failure (null/unknown) keeps existing behavior; never assume local.
+        var viaNetwork = MpvNative.GetPropertyAndFree(_mpv, "demuxer-via-network");
+        if (string.Equals(viaNetwork, "no", StringComparison.OrdinalIgnoreCase))
         {
             return 0;
         }
@@ -300,7 +328,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     }
 
 
-    public IReadOnlyList<MediaTrackInfo> ListTracks()
+    public IReadOnlyList<MediaTrackInfo> ListTracks() { lock (_handleGate) { return ListTracksCore(); } }
+
+    private IReadOnlyList<MediaTrackInfo> ListTracksCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -404,7 +434,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     });
 
 
-    public MediaInfoBasics GetMediaInfo()
+    public MediaInfoBasics GetMediaInfo() { lock (_handleGate) { return GetMediaInfoCore(); } }
+
+    private MediaInfoBasics GetMediaInfoCore()
     {
         if (_mpv == nint.Zero)
         {
@@ -430,7 +462,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposeFlag, 1) != 0)
         {
             return;
         }
@@ -440,7 +472,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _wake.Set();
         if (_thread is { IsAlive: true } && Thread.CurrentThread != _thread)
         {
-            _thread.Join(TimeSpan.FromSeconds(3));
+            if (!_thread.Join(TimeSpan.FromSeconds(3)))
+            {
+                // S102: event thread still alive; skip native destroy and handle disposal to avoid use-after-free.
+                _logger.Log("warn", "dispose_join_timeout", "event thread did not exit within 3s; skipped DestroyMpv");
+                return;
+            }
         }
 
         DestroyMpv();
@@ -468,7 +505,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         ObjectDisposedException.ThrowIf(_disposed, this);
         EnsureThread();
         _queue.Enqueue(action);
-        _wake.Set();
+        try
+        {
+            _wake.Set();
+        }
+        catch (ObjectDisposedException)
+        {
+            // S106: Dispose raced after ThrowIf; engine is shutting down, drop the wake.
+        }
     }
 
     private void EngineLoop()
@@ -542,6 +586,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
         MpvNative.mpv_set_option_string(_mpv, "vo", "gpu-next,gpu");
+        // S100 frame-drop: cheaper downscale filter for oversized video (timing/queue unchanged).
+        MpvNative.mpv_set_option_string(_mpv, "dscale", "bilinear");
         MpvNative.mpv_set_option_string(_mpv, "gpu-context", HardwareAccelPolicy.GpuContext);
         MpvNative.mpv_set_option_string(_mpv, "keep-open", "yes");
         MpvNative.mpv_set_option_string(_mpv, "osc", "no");
@@ -561,6 +607,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         MpvNative.mpv_observe_property(_mpv, 1, "pause", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 2, "hwdec-current", MpvFormat.String);
+        MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
         LogRenderPath("after_init");
         return true;
@@ -632,16 +679,32 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
                 break;
             case MpvEventIds.EndFile:
-                SetState(PlaybackState.Ended);
+                // S103: map END_FILE by reason; error -> Error, eof/unknown -> Ended, stop/quit/redirect keep state.
+                var end = LogEndFile(evt.data);
+                if (end is { reason: 4 } failed)
+                {
+                    RaiseError("playback.end_error", MpvNative.GetErrorString(failed.error), recoverable: true);
+                    SetState(PlaybackState.Error);
+                }
+                else if (end is null || end.Value.reason is not (2 or 3 or 5))
+                {
+                    SetState(PlaybackState.Ended);
+                }
                 break;
             case MpvEventIds.VideoReconfig:
+                MaybeFirstFrame();
+                break;
             case MpvEventIds.PlaybackRestart:
+                LogSeekLatency();
                 MaybeFirstFrame();
                 break;
             case MpvEventIds.LogMessage:
                 break;
             case MpvEventIds.PropertyChange:
                 HandlePropertyChange(evt.data);
+                break;
+            default:
+                LogUnhandledEvent(evt.event_id);
                 break;
         }
     }
@@ -671,6 +734,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Playing);
             }
         }
+        else if (string.Equals(name, "eof-reached", StringComparison.Ordinal)
+                 && string.Equals(MpvNative.GetPropertyAndFree(_mpv, "eof-reached"), "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Log("info", "eof_reached", $"pos={MpvNative.GetPropertyAndFree(_mpv, "time-pos") ?? "(n/a)"} state={_state}");
+        }
     }
 
     private void MaybeFirstFrame()
@@ -685,6 +753,53 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
         ReportHwdec();
+    }
+
+    private void LogUnhandledEvent(int id)
+    {
+        var name = id switch
+        {
+            6 => "start_file",
+            11 => "idle",
+            17 => "video_reconfig",
+            18 => "audio_reconfig",
+            20 => "seek",
+            _ => "other",
+        };
+        _logger.Log("info", "mpv_event", $"id={id} name={name} state={_state}");
+    }
+
+    private MpvEventEndFile? LogEndFile(nint data)
+    {
+        if (data == nint.Zero)
+        {
+            return null;
+        }
+        var end = Marshal.PtrToStructure<MpvEventEndFile>(data);
+        var name = end.reason switch
+        {
+            0 => "eof",
+            2 => "stop",
+            3 => "quit",
+            4 => "error",
+            5 => "redirect",
+            _ => "unknown",
+        };
+        _logger.Log(end.reason == 4 ? "warn" : "info", "end_file", $"reason={name}({end.reason}) error={end.error} state={_state}");
+        return end;
+    }
+
+    private void LogSeekLatency()
+    {
+        if (_seekRequestTs == 0)
+        {
+            return;
+        }
+
+        var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _seekRequestTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
+        _seekRequestTs = 0;
+        var slow = ms >= SeekSlowMs;
+        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow}");
     }
 
     /// <summary>Logs vo / gpu-context / hwdec-current / frame drops for Windows spike evidence.</summary>
@@ -736,6 +851,16 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var decoderDrop = decoderDropRaw ?? "(n/a)";
         var voDrop = voDropRaw ?? "(n/a)";
         var deltaPart = FormatDropDeltas(now, frameDropRaw, decoderDropRaw, voDropRaw);
+
+        // S72 diagnostics: extra render_path items, omitted when mpv cannot read them (vo-delayed-frame-count is already vo-drop).
+        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count" })
+        {
+            var val = MpvNative.GetPropertyAndFree(_mpv, key);
+            if (val != null)
+            {
+                deltaPart += $" {key}={val}";
+            }
+        }
 
         _logger.Log(
             "info",
@@ -866,9 +991,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             {
                 call(observer);
             }
-            catch
+            catch (Exception ex)
             {
                 // Observer must not kill the engine thread.
+                _logger.Log("warn", "observer_exception", $"{ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -892,21 +1018,27 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     private void DestroyMpv()
     {
-        if (_mpv == nint.Zero)
+        // S102: atomically take ownership so only one caller destroys the handle.
+        // S104: take the handle under _handleGate so no getter is mid-call; destroy outside the lock (no UI-thread wait).
+        nint h;
+        lock (_handleGate)
+        {
+            h = Interlocked.Exchange(ref _mpv, nint.Zero);
+        }
+        if (h == nint.Zero)
         {
             return;
         }
 
         try
         {
-            MpvNative.mpv_terminate_destroy(_mpv);
+            MpvNative.mpv_terminate_destroy(h);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Log("warn", "mpv_destroy_failed", $"{ex.GetType().Name}: {ex.Message}");
             // Best-effort shutdown.
         }
-
-        _mpv = nint.Zero;
     }
 }
 

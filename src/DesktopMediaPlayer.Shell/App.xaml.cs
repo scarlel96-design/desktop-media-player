@@ -36,7 +36,22 @@ public partial class App : Application
         Facade.RenderHost = Engine.RenderHost;
         Engine.Observer = Facade;
         Playlist = new MinimalPlaylistService(Facade);
-        ResumeStore = new FileResumeStore();
+        ResumeStore = new FileResumeStore(Logger);
+    }
+
+    internal void ApplyColorTheme(bool dark)
+    {
+        var d = new ResourceDictionary { Source = new System.Uri(dark ? "Themes/Lumen.Colors.Dark.xaml" : "Themes/Lumen.Colors.Light.xaml", System.UriKind.Relative) };
+        var m = Resources.MergedDictionaries;
+        for (var i = 0; i < m.Count; i++)
+        {
+            if (m[i].Source?.OriginalString.Contains("Lumen.Colors.") == true)
+            {
+                m[i] = d;
+                return;
+            }
+        }
+        m.Add(d);
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -45,9 +60,10 @@ public partial class App : Application
         {
             Facade?.Dispose();
         }
-        catch
+        catch (Exception ex)
         {
             // ignore
+            Logger?.Log("warn", "facade_dispose_exception", $"{ex.GetType().Name}: {ex.Message}");
         }
 
         try

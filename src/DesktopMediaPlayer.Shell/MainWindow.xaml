@@ -4,43 +4,18 @@
         xmlns:local="clr-namespace:DesktopMediaPlayer.Shell"
         Title="Desktop Media Player"
         Width="960" Height="640"
-        MinWidth="640" MinHeight="400"
-        Background="#121212"
-        Foreground="#F0F0F0"
+        MinWidth="{StaticResource Lumen.Size.WindowMinWidth}" MinHeight="400"
+        Background="{DynamicResource Lumen.Legacy.WindowBrush}"
+        Foreground="{DynamicResource Lumen.Legacy.ForegroundBrush}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"
         PreviewMouseWheel="Window_PreviewMouseWheel">
   <!-- S1–S5: UX-001 chrome. Blur OFF. L1≤2. Facade-only. -->
-  <Window.Resources>
-    <Style x:Key="TransportButton" TargetType="Button">
-      <Setter Property="Width" Value="40"/>
-      <Setter Property="Height" Value="40"/>
-      <Setter Property="Margin" Value="0,0,8,0"/>
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="Background" Value="#2A2A2A"/>
-      <Setter Property="Foreground" Value="#F0F0F0"/>
-      <Setter Property="BorderBrush" Value="#3A3A3A"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="FontSize" Value="14"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-    </Style>
-    <Style x:Key="ChromeCaption" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="FontFamily" Value="Consolas"/>
-      <Setter Property="VerticalAlignment" Value="Center"/>
-      <Setter Property="Foreground" Value="#C8C8C8"/>
-    </Style>
-    <Style x:Key="SidePanel" TargetType="Border">
-      <Setter Property="Background" Value="#F0121212"/>
-      <Setter Property="BorderBrush" Value="#3A3A3A"/>
-      <Setter Property="BorderThickness" Value="1,0,0,0"/>
-      <Setter Property="Padding" Value="12"/>
-    </Style>
-  </Window.Resources>
 
   <Grid MouseMove="Root_MouseMove">
     <Grid.ColumnDefinitions>
@@ -48,25 +23,34 @@
       <ColumnDefinition x:Name="SideColumn" Width="0"/>
     </Grid.ColumnDefinitions>
 
-    <Grid Grid.Column="0">
-      <!-- L0 video -->
-      <Border Background="#000000"
+    <Grid Grid.Column="0" Background="{DynamicResource Lumen.Surface.VideoBrush}">
+      <!-- KI-022 Soft: separate HWND video row from chrome (airspace). video=* / chrome=Auto -->
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <!-- L0 video (row 0 only — HWND must not cover chrome) -->
+      <Border Grid.Row="0" Background="#000000"
               MouseLeftButtonDown="VideoArea_MouseLeftButtonDown">
         <local:VideoHwndHost x:Name="VideoHost"/>
       </Border>
 
       <!-- S11 Opening spinner (Opacity-only, Shell-only) -->
-      <ProgressBar x:Name="OpeningSpinner" Width="48" Height="48"
+      <ProgressBar x:Name="OpeningSpinner" Grid.Row="0" Width="48" Height="48"
                    IsIndeterminate="True" IsHitTestVisible="False"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    Visibility="Collapsed" Opacity="0.9"
                    Foreground="#CCFFFFFF" Background="Transparent" BorderThickness="0"/>
 
-      <!-- L1 bottom chrome -->
+      <!-- L1 bottom chrome (own Auto row — outside HWND layout box) -->
       <Border x:Name="BottomChrome"
-              VerticalAlignment="Bottom"
-              Background="#E6121212"
-              Padding="16,8,16,8">
+              Grid.Row="1"
+              Background="{DynamicResource Lumen.Surface.ChromeBrush}"
+              BorderBrush="{DynamicResource Lumen.Border.SubtleBrush}"
+              BorderThickness="0,1,0,0"
+              MouseLeave="BottomChrome_MouseLeave"
+              Padding="16,7,16,8">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="28"/>
@@ -81,91 +65,111 @@
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="CurrentTimeText" Grid.Column="0"
-                       Style="{StaticResource ChromeCaption}"
-                       Text="--:--" Margin="0,0,12,0"/>
+                       Style="{StaticResource ChromeTimeCurrent}"
+                       Text="--:--" Margin="0,0,12,0" MinWidth="{StaticResource Lumen.Size.TimeLabelMinWidth}" TextAlignment="Right"/>
             <Grid Grid.Column="1" MinHeight="24" VerticalAlignment="Center"
                   MouseMove="SeekArea_MouseMove" MouseLeave="SeekArea_MouseLeave">
               <ProgressBar x:Name="BufferBar" Height="4" Minimum="0" Maximum="1" Value="0"
                            VerticalAlignment="Center" IsHitTestVisible="False"
-                           Foreground="#4466AA" Background="#22FFFFFF" BorderThickness="0"/>
+                           Foreground="{DynamicResource Lumen.Track.BufferBrush}" Background="{DynamicResource Lumen.Track.RailBrush}" BorderThickness="0"/>
               <Slider x:Name="SeekSlider"
                       Minimum="0" Maximum="3600" Value="0"
                       VerticalAlignment="Center" Height="24"
                       Background="Transparent"
+                      Style="{StaticResource LumenSeekSlider}"
                       IsMoveToPointEnabled="True"
-                      PreviewMouseLeftButtonUp="SeekSlider_Committed"
                       LostMouseCapture="SeekSlider_LostCapture"/>
-              <Popup x:Name="HoverTimePopup" AllowsTransparency="True" Placement="Relative"
+              <Popup x:Name="HoverTimePopup" AllowsTransparency="False" PopupAnimation="None" Placement="Relative"
                      PlacementTarget="{Binding ElementName=SeekSlider}" IsOpen="False"
                      IsHitTestVisible="False">
-                <Border Background="#E0181818" CornerRadius="4" Padding="8,4">
-                  <TextBlock x:Name="HoverTimeText" Foreground="#EEE" FontSize="12"/>
+                <Border Background="{DynamicResource Lumen.Surface.RaisedBrush}" BorderBrush="{DynamicResource Lumen.Border.SubtleBrush}" BorderThickness="1" Padding="8,4">
+                  <TextBlock x:Name="HoverTimeText" Foreground="{DynamicResource Lumen.Text.PrimaryBrush}" FontSize="{DynamicResource Lumen.Type.Caption}"/>
                 </Border>
               </Popup>
             </Grid>
             <TextBlock x:Name="TotalTimeText" Grid.Column="2"
-                       Style="{StaticResource ChromeCaption}"
-                       Text="--:--" Margin="12,0,0,0"/>
+                       Style="{StaticResource ChromeTimeLabel}"
+                       Text="--:--" Margin="12,0,0,0" MinWidth="{StaticResource Lumen.Size.TimeLabelMinWidth}"/>
           </Grid>
 
           <DockPanel Grid.Row="2" LastChildFill="False">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
-              <Button x:Name="OpenButton" Style="{StaticResource TransportButton}"
-                      Content="⏏" ToolTip="Open" Click="Open_Click" FontSize="16"/>
-              <Button x:Name="PrevButton" Style="{StaticResource TransportButton}"
-                      Content="⏮" ToolTip="Previous (stop at ends)"
-                      Click="Prev_Click" IsEnabled="False"/>
-              <Button x:Name="PlayButton" Style="{StaticResource TransportButton}"
-                      Content="▶" ToolTip="Play" Click="Play_Click"/>
-              <Button x:Name="PauseButton" Style="{StaticResource TransportButton}"
-                      Content="⏸" ToolTip="Pause" Click="Pause_Click"/>
-              <Button x:Name="StopButton" Style="{StaticResource TransportButton}"
-                      Content="⏹" ToolTip="Stop" Click="Stop_Click"/>
-              <Button x:Name="NextButton" Style="{StaticResource TransportButton}"
-                      Content="⏭" ToolTip="Next (stop at ends)"
-                      Click="Next_Click" IsEnabled="False"/>
-              <Button x:Name="FrameBackButton" Style="{StaticResource TransportButton}"
-                      Content="⏮|" ToolTip="Frame back" Click="FrameBack_Click"/>
-              <Button x:Name="FrameStepButton" Style="{StaticResource TransportButton}"
-                      Content="|⏭" ToolTip="Frame step" Click="FrameStep_Click" Margin="0,0,16,0"/>
+              <Button x:Name="OpenButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Open}" ToolTip="Open"
+                      AutomationProperties.Name="Open" Click="Open_Click"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
+              <Button x:Name="PrevButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Prev}" ToolTip="Previous (stop at ends)"
+                      AutomationProperties.Name="Previous" Click="Prev_Click" IsEnabled="False"/>
+              <Button x:Name="PlayButton" Style="{StaticResource LumenPrimaryIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Play}" ToolTip="Play"
+                      AutomationProperties.Name="Play/Pause" Click="PlayPause_Click"/>
+              <Button x:Name="PauseButton" Style="{StaticResource LumenPrimaryIconButton}"
+                      Content="{DynamicResource Lumen.Icon.Pause}" ToolTip="Pause"
+                      AutomationProperties.Name="Pause" Click="Pause_Click" Visibility="Collapsed"/>
+              <Button x:Name="StopButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Stop}" ToolTip="Stop"
+                      AutomationProperties.Name="Stop" Click="Stop_Click"/>
+              <Button x:Name="NextButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Next}" ToolTip="Next (stop at ends)"
+                      AutomationProperties.Name="Next" Click="Next_Click" IsEnabled="False"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
+              <Button x:Name="FrameBackButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.FrameBack}" ToolTip="Frame back"
+                      AutomationProperties.Name="Frame back" Click="FrameBack_Click"/>
+              <Button x:Name="FrameStepButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.FrameStep}" ToolTip="Frame step"
+                      AutomationProperties.Name="Frame step" Click="FrameStep_Click"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
             </StackPanel>
 
             <StackPanel x:Name="VolumeGroup" Orientation="Horizontal" VerticalAlignment="Center"
                         DockPanel.Dock="Left" Margin="0,0,16,0"
                         PreviewMouseWheel="VolumeGroup_PreviewMouseWheel">
-              <Button x:Name="MuteButton" Style="{StaticResource TransportButton}"
-                      Content="🔊" ToolTip="Mute" Click="Mute_Click"/>
+              <Button x:Name="MuteButton" Style="{StaticResource LumenIconButton}"
+                      Content="{DynamicResource Lumen.Icon.VolumeOn}" AutomationProperties.Name="Mute"
+                      Margin="0,0,8,0" ToolTip="Mute" Click="Mute_Click"/>
               <Slider x:Name="VolumeSlider"
                       Width="96" MinWidth="88" MaxWidth="104"
                       Minimum="0" Maximum="100" Value="80"
-                      VerticalAlignment="Center"
+                      VerticalAlignment="Center" Height="24"
+                      Style="{StaticResource LumenVolumeSlider}"
                       TickFrequency="1" IsSnapToTickEnabled="True"
+                      IsMoveToPointEnabled="True"
                       ValueChanged="VolumeSlider_ValueChanged"
                       ToolTip="Volume"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right">
-              <Button x:Name="SubButton" Style="{StaticResource TransportButton}"
-                      Content="CC" ToolTip="Subtitles" Click="Sub_Click"/>
-              <Button x:Name="AudioButton" Style="{StaticResource TransportButton}"
-                      Content="♪" ToolTip="Audio" Click="Audio_Click"/>
-              <Button x:Name="PlaylistButton" Style="{StaticResource TransportButton}"
-                      Content="≡" ToolTip="Playlist" Click="Playlist_Click"/>
-              <Button x:Name="ScreenshotButton" Style="{StaticResource TransportButton}"
-                      Content="🖼" ToolTip="Screenshot" Click="Screenshot_Click"/>
-              <Button x:Name="InfoButton" Style="{StaticResource TransportButton}"
-                      Content="ℹ" ToolTip="Media info" Click="Info_Click"/>
-              <Button x:Name="ThemeButton" Style="{StaticResource TransportButton}"
-                      Content="◐" ToolTip="Theme: Dark/Light/System" Click="Theme_Click"/>
-              <Button x:Name="FullscreenButton" Style="{StaticResource TransportButton}"
-                      Content="⛶" ToolTip="Fullscreen" Margin="0" Click="Fullscreen_Click"/>
+              <Button x:Name="SubButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Subtitle}" ToolTip="Subtitles"
+                      AutomationProperties.Name="Subtitles" Click="Sub_Click"/>
+              <Button x:Name="AudioButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Audio}" ToolTip="Audio"
+                      AutomationProperties.Name="Audio" Click="Audio_Click"/>
+              <Border Style="{StaticResource ChromeDivider}"/>
+              <Button x:Name="PlaylistButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Playlist}" ToolTip="Playlist"
+                      AutomationProperties.Name="Playlist" Click="Playlist_Click"/>
+              <Button x:Name="ScreenshotButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Screenshot}" ToolTip="Screenshot"
+                      AutomationProperties.Name="Screenshot" Click="Screenshot_Click"/>
+              <Button x:Name="InfoButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.Info}" ToolTip="Media info"
+                      AutomationProperties.Name="Media info" Click="Info_Click"/>
+              <Button x:Name="ThemeButton" Style="{StaticResource LumenIconButton}" Margin="0,0,8,0"
+                      Content="{DynamicResource Lumen.Icon.ThemeDark}" ToolTip="Theme: Dark/Light/System"
+                      AutomationProperties.Name="Theme" Click="Theme_Click"/>
+              <Button x:Name="FullscreenButton" Style="{StaticResource LumenIconButton}" Margin="0"
+                      Content="{DynamicResource Lumen.Icon.FullscreenEnter}" ToolTip="Fullscreen"
+                      AutomationProperties.Name="Fullscreen" Click="Fullscreen_Click"/>
             </StackPanel>
           </DockPanel>
         </Grid>
       </Border>
 
       <!-- Track flyout (immediate, non-modal) -->
-      <Border x:Name="TrackFlyout" Style="{StaticResource SidePanel}"
+      <Border x:Name="TrackFlyout" Grid.Row="0" Style="{StaticResource SidePanel}"
               HorizontalAlignment="Right" VerticalAlignment="Bottom"
               Margin="0,0,16,108" Width="280" MaxHeight="280"
               Visibility="Collapsed">
@@ -183,7 +187,7 @@
         </DockPanel>
       </Border>
 
-      <Border x:Name="MediaInfoFlyout" Style="{StaticResource SidePanel}"
+      <Border x:Name="MediaInfoFlyout" Grid.Row="0" Style="{StaticResource SidePanel}"
               HorizontalAlignment="Left" VerticalAlignment="Bottom"
               Margin="16,0,0,108" Width="320" MaxHeight="320"
               Visibility="Collapsed">
@@ -199,13 +203,13 @@
         </DockPanel>
       </Border>
 
-      <StackPanel VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
-        <TextBlock x:Name="StatusText" Text="Ready" Foreground="#A0FFFFFF" TextWrapping="Wrap"/>
+      <StackPanel Grid.Row="0" VerticalAlignment="Top" Margin="16" IsHitTestVisible="False">
+        <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource Lumen.Legacy.StatusBrush}" TextWrapping="Wrap"/>
         <TextBlock x:Name="ErrorText" Foreground="#FF6B6B" Margin="0,6,0,0"
                    TextWrapping="Wrap" Visibility="Collapsed"/>
       </StackPanel>
 
-      <TextBlock x:Name="SubtitleOsdText"
+      <TextBlock x:Name="SubtitleOsdText" Grid.Row="0"
                  HorizontalAlignment="Center" VerticalAlignment="Center"
                  FontSize="28" FontWeight="SemiBold" Foreground="#F0FFFFFF"
                  IsHitTestVisible="False" Opacity="0" Text=""/>
@@ -220,7 +224,11 @@
                    Text="No items — Open a file to start."
                    Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,8"
                    Visibility="Visible"/>
-        <Button DockPanel.Dock="Bottom" Content="Open…" Margin="0,8,0,0" Click="Open_Click"/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+          <Button Content="Open…" Margin="0,0,8,0" Click="Open_Click"/>
+          <Button x:Name="PlaylistClearButton" Content="Clear" Click="PlaylistClear_Click" IsEnabled="False"
+                  ToolTip="Clear playlist (Soft)"/>
+        </StackPanel>
         <ListBox x:Name="PlaylistList"
                  Background="Transparent" BorderThickness="0" Foreground="#F0F0F0"
                  MouseDoubleClick="PlaylistList_MouseDoubleClick"/>
