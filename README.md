@@ -1,6 +1,6 @@
-# desktop-media-player (Step 0 tech spike)
+# desktop-media-player
 
-WPF + libmpv playback spike for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
+WPF + libmpv desktop media player for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
 
 **Status: Step 0 PASS WITH KI · Phase A in progress (S0 Contracts/Facade).**
 
@@ -17,11 +17,11 @@ WPF + libmpv playback spike for Windows **win-x64** on **.NET 10** (`net10.0-win
 
 UI talks **only** to `PlaybackFacade` (`IPlaybackEngine`). Shell never P/Invokes libmpv.
 
-## Spike vs MVP
+## Implemented scope
 
-**Spike (this repo):** open local file, play/pause/stop/seek/volume, HWND embed, DPI physical-pixel resize, hwdec policy logging, missing-DLL graceful error.
+**Implemented (this repo):** open local file, play/pause/stop/seek/volume, HWND embed, DPI physical-pixel resize, hwdec policy logging, missing-DLL graceful error, playlist, resume (playback position), themes, subtitles (external subtitle load), screenshot, OSD, copy to clipboard (path/name/folder/title), always-on-top.
 
-**Not in spike:** playlist, resume, themes, subtitle UI, installer, auto-update, packaging of binaries in git.
+**Not implemented:** Blur/Acrylic, P1 features, installer, auto-update, packaging of binaries in git.
 
 ## LGPL / dynamic-link note
 
