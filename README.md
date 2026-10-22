@@ -2,7 +2,7 @@
 
 WPF + libmpv desktop media player for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
 
-**Status: Step 0 PASS WITH KI · Phase A in progress (S0 Contracts/Facade).**
+**Status: Phase A Soft canonical e099c2e (BLD-20261021-PHASEA-S132-001). Windows high-risk check 2026-10-22: KI-030 and shutdown PASS, KI-031 Low (cause NOT VERIFIED). See KNOWN_ISSUES.**
 
 ## Layers
 
@@ -10,7 +10,7 @@ WPF + libmpv desktop media player for Windows **win-x64** on **.NET 10** (`net10
 |---------|------|
 | `DesktopMediaPlayer.Contracts` | Frozen `IPlaybackEngine`, `IPlaybackObserver`, `IRenderHost`, `PlaybackState` |
 | `DesktopMediaPlayer.Platform` | `SpikeLogger`, `HardwareAccelPolicy` (D3D11VA → copy → software) |
-| `DesktopMediaPlayer.Playback` | `PlaybackFacade` — volume clamp, observer fan-out, path validation |
+| `DesktopMediaPlayer.Playback` | `PlaybackFacade` — volume clamp, observer fan-out, path validation; `MinimalPlaylistService` — playlist service |
 | `DesktopMediaPlayer.Engine.Mpv` | libmpv P/Invoke, engine thread, `MpvPlaybackEngine`, `MpvRenderHost` |
 | `DesktopMediaPlayer.Shell` | WPF UI, `VideoHwndHost`, PerMonitorV2 DPI; **no** mpv DllImport |
 | `DesktopMediaPlayer.Playback.Tests` | Facade unit tests (no native DLL) |
