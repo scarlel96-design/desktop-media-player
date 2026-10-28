@@ -27,13 +27,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private PlaybackState _state = PlaybackState.Idle;
     private bool _firstFrameRaised;
     private long _seekRequestTs; // RV-01 Soft: Stopwatch ticks of pending seek request; 0 = none.
+    private int _seekCount; // K1: seek commands issued within the open _seekRequestTs measurement.
     private volatile bool _disposed;
     private int _disposeFlag; // S105: atomic Dispose entry guard
     private string? _pendingOpen;
     private int _volume = 100;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
-    private const int SeekSlowMs = 1000;
+    private const int SeekSlowMs = 500;
 
     // KI-014 Soft: absolute drop counters + Δrate between samples (≠ perceived stutter).
     private long? _prevFrameDrop;
@@ -148,7 +149,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
         {
             _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+            _seekCount = 0;
         }
+
+        _seekCount += rc >= 0 && _seekRequestTs != 0 ? 1 : 0;
     });
 
     public void SetVolume(int volume) => Post(() =>
@@ -799,7 +803,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _seekRequestTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
         _seekRequestTs = 0;
         var slow = ms >= SeekSlowMs;
-        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow}");
+        var hwdec = MpvNative.GetPropertyAndFree(_mpv, "hwdec-current") ?? "(unknown)";
+        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow} seeks={_seekCount} hwdec-current={hwdec}");
     }
 
     /// <summary>Logs vo / gpu-context / hwdec-current / frame drops for Windows spike evidence.</summary>
@@ -853,7 +858,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var deltaPart = FormatDropDeltas(now, frameDropRaw, decoderDropRaw, voDropRaw);
 
         // S72 diagnostics: extra render_path items, omitted when mpv cannot read them (vo-delayed-frame-count is already vo-drop).
-        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count" })
+        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count",
+                                  "video-codec", "estimated-display-fps", "vsync-jitter", "display-sync-active", "dwidth", "dheight", "osd-dimensions/w", "osd-dimensions/h", "hwdec-interop" })
         {
             var val = MpvNative.GetPropertyAndFree(_mpv, key);
             if (val != null)
@@ -897,9 +903,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             }
 
             var d = cur - prev.Value;
+            var reset = d < 0; // K1: mpv resets drop counters on seek; report current value instead.
+            d = reset ? cur : d;
             var rate = d / dt;
             return $" {name}-delta={d.ToString(CultureInfo.InvariantCulture)}"
-                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s";
+                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s{(reset ? " reset=1" : "")}";
         }
 
         var part = FormatOne("frame-drop", frameRaw, _prevFrameDrop)
