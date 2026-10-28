@@ -907,7 +907,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             d = reset ? cur : d;
             var rate = d / dt;
             return $" {name}-delta={d.ToString(CultureInfo.InvariantCulture)}"
-                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s{(reset ? " reset=1" : "")}";
+                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s{(reset ? $" {name}-reset=1" : "")}";
         }
 
         var part = FormatOne("frame-drop", frameRaw, _prevFrameDrop)
