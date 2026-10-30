@@ -2416,6 +2416,9 @@ public partial class MainWindow : Window, IPlaybackObserver
             ArmAutoHide();
             ApplyPendingResumeAtFirstFrame();
             SoftUpdateWindowTitle();
+#if DMP_DIAG
+            (Application.Current as App)?.DiagSeek?.Start();
+#endif
         });
     }
 
@@ -2600,6 +2603,9 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     protected override void OnClosed(EventArgs e)
     {
+#if DMP_DIAG
+        (Application.Current as App)?.DiagSeek?.Stop();
+#endif
         WindowBoundsStore.Persist(this);
         PersistVolumePrefs();
         PersistThemePrefs();

@@ -70,6 +70,10 @@ public static class DiagMpvOptions
     public static bool OverridesCscale(IEnumerable<string> appliedKeys) =>
         appliedKeys.Contains("cscale", StringComparer.Ordinal);
 
+    /// <summary>L2 marker for the vo-passes string form: json (object), other (non-JSON text), none (empty).</summary>
+    public static string VoPassesFormat(string? voPasses) =>
+        string.IsNullOrWhiteSpace(voPasses) ? "none" : voPasses.TrimStart().StartsWith('{') ? "json" : "other";
+
     /// <summary>Sum of vo-passes fresh[].avg (ns, mpv JSON) in ms; null when unreadable.</summary>
     public static double? SumFreshAvgMs(string? voPassesJson)
     {

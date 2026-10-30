@@ -16,6 +16,9 @@ public partial class App : Application
     internal IResumeStore? ResumeStore { get; private set; }
     internal string? StartupMediaPath { get; private set; }
     internal int StartupArgCount { get; private set; }
+#if DMP_DIAG
+    internal DiagSeekRunner? DiagSeek { get; private set; }
+#endif
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -39,9 +42,46 @@ public partial class App : Application
         Engine.Observer = Facade;
         Playlist = new MinimalPlaylistService(Facade);
         ResumeStore = new FileResumeStore(Logger);
-        StartupArgCount = e.Args.Length;
-        StartupMediaPath = StartupArgs.FirstMediaPath(e.Args, System.IO.File.Exists);
+#if DMP_DIAG
+        var seekScriptPath = DiagSeekScript.ExtractPath(e.Args, out var args);
+        DiagSeek = LoadDiagSeekScript(seekScriptPath);
+#else
+        System.Collections.Generic.IReadOnlyList<string> args = e.Args;
+#endif
+        StartupArgCount = args.Count;
+        StartupMediaPath = StartupArgs.FirstMediaPath(args, System.IO.File.Exists);
     }
+
+#if DMP_DIAG
+    private DiagSeekRunner? LoadDiagSeekScript(string? path)
+    {
+        if (path is null || Logger is null || Facade is null)
+        {
+            return null;
+        }
+
+        string[] lines;
+        try
+        {
+            lines = System.IO.File.ReadAllLines(System.IO.Path.GetFullPath(path), System.Text.Encoding.UTF8);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            Logger.Log("warn", "diag_seek", $"read_error={ex.GetType().Name}");
+            return null;
+        }
+
+        var result = DiagSeekScript.Parse(lines);
+        if (result.RejectedLine is int line)
+        {
+            Logger.Log("warn", "diag_seek", $"rejected line={line}");
+            return null;
+        }
+
+        Logger.Log("info", "diag_seek", $"loaded steps={result.Steps.Count}");
+        return new DiagSeekRunner(result.Steps, Facade, Logger);
+    }
+#endif
 
     internal void ApplyColorTheme(bool dark)
     {

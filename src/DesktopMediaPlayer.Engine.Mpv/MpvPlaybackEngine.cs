@@ -962,8 +962,18 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     private void MaybeLogDiagSummary(DateTime now)
     {
-        using var proc = System.Diagnostics.Process.GetCurrentProcess();
-        var cpu = proc.TotalProcessorTime;
+        var wall = now - _diagSummaryUtc;
+        if (_diagSummaryUtc != DateTime.MinValue && wall < DiagSummaryInterval)
+        {
+            return;
+        }
+
+        TimeSpan cpu;
+        using (var proc = System.Diagnostics.Process.GetCurrentProcess())
+        {
+            cpu = proc.TotalProcessorTime;
+        }
+
         long? drop = long.TryParse(MpvNative.GetPropertyAndFree(_mpv, "frame-drop-count"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var d) ? d : null;
         if (_diagSummaryUtc == DateTime.MinValue)
         {
@@ -971,16 +981,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return;
         }
 
-        var wall = now - _diagSummaryUtc;
-        if (wall < DiagSummaryInterval)
-        {
-            return;
-        }
-
         double? dropRate = drop is long cur && _diagSummaryDrop is long prev && cur >= prev ? (cur - prev) / wall.TotalSeconds : null;
-        var freshMs = DiagMpvOptions.SumFreshAvgMs(MpvNative.GetPropertyAndFree(_mpv, "vo-passes"));
+        var voPasses = MpvNative.GetPropertyAndFree(_mpv, "vo-passes");
+        var freshMs = DiagMpvOptions.SumFreshAvgMs(voPasses);
         var cpuPct = DiagMpvOptions.CpuPercent(cpu - _diagSummaryCpu, wall, Environment.ProcessorCount);
-        _logger.Log("info", "diag_summary", $"window={DiagMpvOptions.Fmt(wall.TotalSeconds)}s frame-drop-rate={DiagMpvOptions.Fmt(dropRate)}/s fresh-avg-ms={DiagMpvOptions.Fmt(freshMs)} process-cpu={DiagMpvOptions.Fmt(cpuPct)}%");
+        // vo-drop-rate counts frame-drop-count (VO drops only; decoder drops are not included).
+        // vo-passes-fmt=json|other|none is an L2 marker: if fresh-avg-ms stays (n/a) with fmt=other, switch to the node API.
+        _logger.Log("info", "diag_summary", $"window={DiagMpvOptions.Fmt(wall.TotalSeconds)}s vo-drop-rate={DiagMpvOptions.Fmt(dropRate)}/s fresh-avg-ms={DiagMpvOptions.Fmt(freshMs)} vo-passes-fmt={DiagMpvOptions.VoPassesFormat(voPasses)} process-cpu={DiagMpvOptions.Fmt(cpuPct)}%");
         (_diagSummaryUtc, _diagSummaryDrop, _diagSummaryCpu) = (now, drop, cpu);
     }
 #endif
