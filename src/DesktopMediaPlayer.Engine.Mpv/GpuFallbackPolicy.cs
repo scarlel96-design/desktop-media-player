@@ -1,6 +1,6 @@
 using DesktopMediaPlayer.Contracts;
 
-namespace DesktopMediaPlayer.Playback;
+namespace DesktopMediaPlayer.Engine.Mpv;
 
 /// <summary>A5-a: where the first load failed. Vo = VO init failed / vo-configured timeout; Media = any other end_file error.</summary>
 public enum GpuFailureStage

@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using DesktopMediaPlayer.Contracts;
 using DesktopMediaPlayer.Engine.Mpv.Native;
 using DesktopMediaPlayer.Platform;
-using DesktopMediaPlayer.Playback;
 
 namespace DesktopMediaPlayer.Engine.Mpv;
 
@@ -924,6 +923,16 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _gpuAdapterApplied = false;
         _logger.Log("warn", "gpu_policy", "fallback=1 reason=vo_init_failed");
         MpvNative.mpv_set_property_string(_mpv, "d3d11-adapter", "");
+        // Re-set vo to its current value so mpv recreates the VO with the cleared adapter (it may still exist after a timeout).
+        var vo = MpvNative.GetPropertyAndFree(_mpv, "vo");
+        if (!string.IsNullOrEmpty(vo))
+        {
+            var rc = MpvNative.mpv_set_property_string(_mpv, "vo", vo);
+            if (rc < 0)
+            {
+                _logger.Log("warn", "gpu_policy", $"vo_reset_failed error={MpvNative.GetErrorString(rc)}");
+            }
+        }
         CancelVoTimer();
         SetState(PlaybackState.Opening);
         LoadFile(_pendingOpen);

@@ -2,7 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DesktopMediaPlayer.Contracts;
-using DesktopMediaPlayer.Playback;
+using DesktopMediaPlayer.Engine.Mpv;
 
 namespace DesktopMediaPlayer.Shell;
 

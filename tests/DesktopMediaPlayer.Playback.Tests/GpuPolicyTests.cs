@@ -1,4 +1,5 @@
 using DesktopMediaPlayer.Contracts;
+using DesktopMediaPlayer.Engine.Mpv;
 using Xunit;
 
 namespace DesktopMediaPlayer.Playback.Tests;

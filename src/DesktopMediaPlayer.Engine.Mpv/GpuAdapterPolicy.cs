@@ -1,6 +1,6 @@
 using DesktopMediaPlayer.Contracts;
 
-namespace DesktopMediaPlayer.Playback;
+namespace DesktopMediaPlayer.Engine.Mpv;
 
 /// <summary>A5-a: d3d11-adapter value to set pre-init (null = leave unset) and why.</summary>
 public sealed record GpuAdapterDecision(string? Adapter, string Reason);
