@@ -54,4 +54,26 @@ public sealed class CscalePolicyTests
         Assert.Equal(1, CscalePolicy.ChromaShift("p010"));
         Assert.Equal(1, CscalePolicy.ChromaShift("yuv420p10"));
     }
+
+    [Theory]
+    [InlineData("nv12", "d3d11", 1)]
+    [InlineData("p010", "d3d11", 1)]
+    [InlineData(null, "yuv420p", 1)]
+    [InlineData("", "yuv420p", 1)]
+    [InlineData(null, "d3d11", 0)]
+    public void EffectivePixelFormat_PrefersHw(string? hw, string? sw, int shift) =>
+        Assert.Equal(shift, CscalePolicy.ChromaShift(CscalePolicy.EffectivePixelFormat(hw, sw)));
+
+    [Fact]
+    public void BothFormatsEmpty_Lanczos() =>
+        Assert.Equal(CscalePolicy.Lanczos,
+            CscalePolicy.Decide(1280, 720, 3840, 2160, CscalePolicy.ChromaShift(CscalePolicy.EffectivePixelFormat(null, null))));
+
+    [Fact]
+    public void Hw4kSmallWindow_Bilinear() =>
+        Assert.Equal(CscalePolicy.Bilinear,
+            CscalePolicy.Decide(1280, 720, 3840, 2160, CscalePolicy.ChromaShift(CscalePolicy.EffectivePixelFormat("nv12", "d3d11"))));
+
+    [Fact]
+    public void ChromaSize_Ceil() => Assert.Equal(541, CscalePolicy.ChromaSize(1081, 1));
 }

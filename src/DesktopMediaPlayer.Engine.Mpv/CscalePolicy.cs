@@ -33,4 +33,12 @@ public static class CscalePolicy
         var f = pixelFormat.ToLowerInvariant();
         return f.Contains("420") || f is "nv12" or "nv21" or "p010" or "p016" ? 1 : 0;
     }
+
+    /// <summary>A5-b fix: with hwdec (e.g. d3d11va) pixelformat is the hw format ("d3d11"); the real surface format is hw-pixelformat.</summary>
+    public static string? EffectivePixelFormat(string? hwPixelFormat, string? pixelFormat) =>
+        string.IsNullOrEmpty(hwPixelFormat) ? pixelFormat : hwPixelFormat;
+
+    /// <summary>Chroma plane size (ceil), same rounding as Decide.</summary>
+    public static int ChromaSize(int size, int chromaShift) =>
+        chromaShift <= 0 ? size : (size + (1 << chromaShift) - 1) >> chromaShift;
 }

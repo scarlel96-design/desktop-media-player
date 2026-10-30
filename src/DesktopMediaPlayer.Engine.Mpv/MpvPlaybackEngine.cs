@@ -718,7 +718,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 break;
             case MpvEventIds.VideoReconfig:
                 LogUnhandledEvent(evt.event_id);
-                ApplyCscalePolicy();
+                ApplyCscalePolicy(logDecision: true);
                 break;
             case MpvEventIds.PlaybackRestart:
                 LogSeekLatency();
@@ -747,6 +747,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         if (string.Equals(name, "hwdec-current", StringComparison.Ordinal))
         {
             ReportHwdec();
+            ApplyCscalePolicy(); // hw-pixelformat may be filled late, after VideoReconfig
         }
         else if (string.Equals(name, "osd-dimensions", StringComparison.Ordinal))
         {
@@ -771,21 +772,31 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
     }
 
-    // A5-b: the only place cscale is set. Re-evaluated on VideoReconfig and window resize (osd-dimensions).
-    private void ApplyCscalePolicy()
+    // A5-b: the only place cscale is set. Re-evaluated on VideoReconfig, window resize (osd-dimensions) and hwdec-current change.
+    private void ApplyCscalePolicy(bool logDecision = false)
     {
         int P(string n) => int.TryParse(MpvNative.GetPropertyAndFree(_mpv, n), out var v) ? v : 0;
         var dispW = P("osd-dimensions/w") - P("osd-dimensions/ml") - P("osd-dimensions/mr");
         var dispH = P("osd-dimensions/h") - P("osd-dimensions/mt") - P("osd-dimensions/mb");
         int srcW = P("video-params/w"), srcH = P("video-params/h");
-        var shift = CscalePolicy.ChromaShift(MpvNative.GetPropertyAndFree(_mpv, "video-params/pixelformat"));
+        var swFmt = MpvNative.GetPropertyAndFree(_mpv, "video-params/pixelformat");
+        var hwFmt = MpvNative.GetPropertyAndFree(_mpv, "video-params/hw-pixelformat");
+        var shift = CscalePolicy.ChromaShift(CscalePolicy.EffectivePixelFormat(hwFmt, swFmt));
         var next = CscalePolicy.Decide(dispW, dispH, srcW, srcH, shift);
+        var chroma = $"{CscalePolicy.ChromaSize(srcW, shift)}x{CscalePolicy.ChromaSize(srcH, shift)}";
+        if (logDecision)
+        {
+            string G(string n) => MpvNative.GetPropertyAndFree(_mpv, n) ?? "(n/a)";
+            _logger.Log("info", "cscale_decision", $"decision={next} cur={_cscale} disp={dispW}x{dispH} chroma={chroma} pixelformat={swFmt ?? "(n/a)"} "
+                + $"hw-pixelformat={hwFmt ?? "(n/a)"} scale={G("scale")} cscale={G("cscale")} dscale={G("dscale")} hwdec-current={G("hwdec-current")}");
+        }
+
         if (next == _cscale || MpvNative.mpv_set_property_string(_mpv, "cscale", next) < 0)
         {
             return;
         }
 
-        _logger.Log("info", "cscale_policy", $"from={_cscale} to={next} disp={dispW}x{dispH} chroma={srcW >> shift}x{srcH >> shift}");
+        _logger.Log("info", "cscale_policy", $"from={_cscale} to={next} disp={dispW}x{dispH} chroma={chroma}");
         _cscale = next;
     }
 
@@ -903,7 +914,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         // S72 diagnostics: extra render_path items, omitted when mpv cannot read them (vo-delayed-frame-count is already vo-drop).
         foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count",
-                                  "video-codec", "estimated-display-fps", "vsync-jitter", "display-sync-active", "dwidth", "dheight", "osd-dimensions/w", "osd-dimensions/h", "hwdec-interop" })
+                                  "video-codec", "estimated-display-fps", "vsync-jitter", "display-sync-active", "dwidth", "dheight", "osd-dimensions/w", "osd-dimensions/h", "hwdec-interop",
+                                  "video-params/hw-pixelformat", "scale", "cscale", "dscale" })
         {
             var val = MpvNative.GetPropertyAndFree(_mpv, key);
             if (val != null)
