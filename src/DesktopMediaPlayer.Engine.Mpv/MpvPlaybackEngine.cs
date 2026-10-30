@@ -658,15 +658,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_request_log_messages(_mpv, "info");
         foreach (var opt in CacheOptions(_cacheDir))
         {
-            try
-            {
-                Directory.CreateDirectory(opt.Value);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _logger.Log("warn", "cache_dir", $"reason={ex.GetType().Name}");
-            }
-
+            // mpv creates these dirs on first write; the app does not pre-create them.
             MpvNative.mpv_set_option_string(_mpv, opt.Key, opt.Value);
         }
 #if DMP_DIAG

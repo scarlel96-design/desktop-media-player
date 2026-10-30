@@ -84,6 +84,20 @@ public sealed class AppDataPaths
 /// <summary>DATADIR: log-safe path text — "&lt;data&gt;/relative" under the data root, otherwise a file-name hash.</summary>
 public static class PathMask
 {
+    /// <summary>Free text (e.g. ex.Message): data root -> "&lt;data&gt;", user profile -> "&lt;user&gt;" (case-insensitive).</summary>
+    public static string MaskText(string? text, AppDataPaths? paths = null, string? userProfile = null)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var root = Path.TrimEndingDirectorySeparator((paths ?? AppDataPaths.Current).Root);
+        var user = Path.TrimEndingDirectorySeparator(userProfile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        var result = root.Length > 0 ? text.Replace(root, "<data>", StringComparison.OrdinalIgnoreCase) : text;
+        return user.Length > 0 ? result.Replace(user, "<user>", StringComparison.OrdinalIgnoreCase) : result;
+    }
+
     public static string Mask(string? path, AppDataPaths? paths = null)
     {
         if (string.IsNullOrWhiteSpace(path))

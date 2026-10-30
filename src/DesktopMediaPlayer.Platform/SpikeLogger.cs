@@ -27,7 +27,8 @@ public sealed class SpikeLogger : IDisposable
 
     public void Log(string level, string eventKey, string message)
     {
-        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] {eventKey} {message}";
+        // DATADIR: mask data root / user profile in every message (ex.Message, native_loaded, ...).
+        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] {eventKey} {PathMask.MaskText(message)}";
         lock (_gate)
         {
             if (_disposed)

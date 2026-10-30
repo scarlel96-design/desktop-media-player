@@ -68,6 +68,39 @@ public sealed class AppDataPathsTests
     }
 
     [Fact]
+    public void InvalidPath_CreatesNothing_UnderFakeDefaultRootOrTarget()
+    {
+        var fakeRoot = NewTemp();
+        Directory.CreateDirectory(fakeRoot);
+        var blocker = Path.Combine(fakeRoot, "blocker");
+        File.WriteAllText(blocker, "x");
+        try
+        {
+            var fake = new AppDataPaths(Path.Combine(fakeRoot, "default"));
+            Assert.False(AppDataPaths.TryParseArgs(new[] { "--data-dir", Path.Combine(blocker, "sub") }, out _, out _));
+            Assert.False(AppDataPaths.TryParseArgs(new[] { "--data-dir", "dmp-relative-" + Guid.NewGuid().ToString("N") }, out _, out _));
+            Assert.Equal(new[] { blocker }, Directory.GetFileSystemEntries(fakeRoot));
+            Assert.False(Directory.Exists(fake.Root));
+        }
+        finally
+        {
+            Directory.Delete(fakeRoot, true);
+        }
+    }
+
+    [Fact]
+    public void MaskText_ReplacesDataRootAndUserProfile_CaseInsensitive()
+    {
+        var user = Path.Combine(Path.GetTempPath(), "FakeUser");
+        var p = new AppDataPaths(Path.Combine(user, "AppData", "dmp"));
+        var message = $"Could not find file '{p.Root.ToUpperInvariant()}{Path.DirectorySeparatorChar}a.json' near '{user}{Path.DirectorySeparatorChar}Videos'";
+        var masked = PathMask.MaskText(message, p, user);
+        Assert.Contains("<data>", masked);
+        Assert.Contains("<user>", masked);
+        Assert.DoesNotContain("FakeUser", masked, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void NonexistentPath_IsCreated()
     {
         var dir = Path.Combine(NewTemp(), "nested");
