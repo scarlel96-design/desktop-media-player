@@ -8,7 +8,10 @@ namespace DesktopMediaPlayer.Playback.Tests;
 
 public sealed class StartupArgsTests
 {
-    private static readonly string Root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "dmp-args"));
+    // Relative root: an absolute Linux path ("/tmp/...") would be treated as a "/" switch by design.
+    private const string Root = "dmp-args";
+
+    private static string Full(string relative) => Path.GetFullPath(relative);
 
     private static Func<string, bool> Existing(params string[] fullPaths)
     {
@@ -32,8 +35,8 @@ public sealed class StartupArgsTests
     public void QuotedPathWithSpaces_IsTrimmedAndReturned()
     {
         var path = Path.Combine(Root, "my movie.mkv");
-        var result = StartupArgs.FirstMediaPath(new[] { "\"" + path + "\"" }, Existing(path));
-        Assert.Equal(path, result);
+        var result = StartupArgs.FirstMediaPath(new[] { "\"" + path + "\"" }, Existing(Full(path)));
+        Assert.Equal(Full(path), result);
     }
 
     [Fact]
@@ -41,8 +44,8 @@ public sealed class StartupArgsTests
     {
         var missing = Path.Combine(Root, "missing.mp4");
         var present = Path.Combine(Root, "present.mp4");
-        var result = StartupArgs.FirstMediaPath(new[] { missing, present }, Existing(present));
-        Assert.Equal(present, result);
+        var result = StartupArgs.FirstMediaPath(new[] { missing, present }, Existing(Full(present)));
+        Assert.Equal(Full(present), result);
     }
 
     [Fact]
@@ -58,7 +61,7 @@ public sealed class StartupArgsTests
     {
         var a = Path.Combine(Root, "a.mp4");
         var b = Path.Combine(Root, "b.mp4");
-        var result = StartupArgs.FirstMediaPath(new[] { "-x", a, b }, Existing(a, b));
-        Assert.Equal(a, result);
+        var result = StartupArgs.FirstMediaPath(new[] { "-x", a, b }, Existing(Full(a), Full(b)));
+        Assert.Equal(Full(a), result);
     }
 }
