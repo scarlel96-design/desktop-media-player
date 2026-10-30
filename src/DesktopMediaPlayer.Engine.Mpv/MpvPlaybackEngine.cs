@@ -60,6 +60,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private string? _diagPolicyAdapter; // gpu-policy-adapter-override (policy only, not an mpv option)
     private bool _diagFaultVo; // gpu-policy-fault=vo (app only)
     private bool _diagFaultInjected;
+    private bool _diagFaultIgnoredLogged;
+    private string? _diagForceAdapter; // gpu-policy-force-adapter (app only)
     private readonly IReadOnlyList<string>? _diagSearchDirs;
 #endif
 
@@ -666,7 +668,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_set_option_string(_mpv, "input-default-bindings", "no");
         MpvNative.mpv_set_option_string(_mpv, "input-vo-keyboard", "no");
         MpvNative.mpv_set_option_string(_mpv, "terminal", "no");
+#if DMP_DIAG
+        MpvNative.mpv_request_log_messages(_mpv, "v"); // DIAG: verbose for d3d11 "Device Name:" (only matching lines are logged)
+#else
         MpvNative.mpv_request_log_messages(_mpv, "info");
+#endif
         foreach (var opt in CacheOptions(_cacheDir))
         {
             // mpv creates these dirs on first write; the app does not pre-create them.
@@ -677,6 +683,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _gpuDiagOverride = diag.Accepted.Any(p => p.Key == "d3d11-adapter");
         _diagPolicyAdapter = diag.PolicyAdapterOverride;
         _diagFaultVo = diag.PolicyFaultVo;
+        _diagForceAdapter = diag.PolicyForceAdapter;
 #endif
         ApplyGpuPolicy();
 
@@ -775,6 +782,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                         break;
                     }
                 }
+                else if (_diagFaultVo && !_diagFaultInjected && !_diagFaultIgnoredLogged
+                    && DiagMpvOptions.FaultIgnoredReason(_gpuAdapterApplied, _gpuRetried, _firstFrameRaised) is string faultReason)
+                {
+                    _diagFaultIgnoredLogged = true;
+                    _logger.Log("warn", "gpu_fault", $"fault=ignored reason={faultReason}");
+                }
 #endif
                 SetState(PlaybackState.Playing);
                 ArmVoConfiguredTimeout();
@@ -806,6 +819,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 MaybeFirstFrame();
                 break;
             case MpvEventIds.LogMessage:
+#if DMP_DIAG
+                // mpv_event_log_message { prefix, level, text, log_level }: log only d3d11 "Device Name:" lines.
+                if (evt.data != nint.Zero
+                    && DiagMpvOptions.TryParseDeviceName(Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(evt.data, 2 * nint.Size)), out var deviceName))
+                {
+                    _logger.Log("info", "gpu_device", $"name={PathMask.MaskText(deviceName)}");
+                }
+#endif
                 break;
             case MpvEventIds.PropertyChange:
                 HandlePropertyChange(evt.data);
@@ -913,6 +934,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         {
             _logger.Log("info", "gpu_policy", $"pref={pref} reason={decision.Reason} ignored=no_policy_adapter");
         }
+
+        if (_gpuPreference == GpuPreference.HighPerformance)
+        {
+            _logger.Log("info", "gpu_probe", DiagMpvOptions.FormatProbe(probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed));
+        }
+
+        decision = DiagMpvOptions.ApplyForceAdapter(decision, _diagForceAdapter);
 #endif
         if (decision.Adapter is not null)
         {

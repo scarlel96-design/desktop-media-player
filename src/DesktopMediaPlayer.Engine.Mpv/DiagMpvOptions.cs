@@ -27,7 +27,44 @@ public static class DiagMpvOptions
         IReadOnlyList<KeyValuePair<string, string>> Accepted,
         IReadOnlyList<KeyValuePair<string, string>> Rejected,
         string? PolicyAdapterOverride = null,
-        bool PolicyFaultVo = false);
+        bool PolicyFaultVo = false,
+        string? PolicyForceAdapter = null);
+
+    /// <summary>App-only key: sets d3d11-adapter only when the policy chose none (reason=diag_force).</summary>
+    public const string PolicyForceAdapterKey = "gpu-policy-force-adapter";
+
+    /// <summary>Force applies only when the (post-override) policy decision has no adapter.</summary>
+    public static GpuAdapterDecision ApplyForceAdapter(GpuAdapterDecision decision, string? forceAdapter) =>
+        forceAdapter is not null && decision.Adapter is null ? new GpuAdapterDecision(forceAdapter, "diag_force") : decision;
+
+    /// <summary>gpu_probe log body: adapter descriptions only.</summary>
+    public static string FormatProbe(IReadOnlyList<string> highPerformanceOrder, string? defaultAdapter, bool failed) =>
+        failed ? "failed=1" : $"default={defaultAdapter ?? "none"} hp=[{string.Join(",", highPerformanceOrder)}]";
+
+    /// <summary>Extracts the value after "Device Name:" from an mpv d3d11 log line.</summary>
+    public static bool TryParseDeviceName(string? text, out string name)
+    {
+        const string marker = "Device Name:";
+        var idx = text?.IndexOf(marker, StringComparison.Ordinal) ?? -1;
+        name = idx >= 0 ? text![(idx + marker.Length)..].Trim() : string.Empty;
+        return name.Length > 0;
+    }
+
+    /// <summary>Why a requested VO fault was not injected (priority: no_policy_adapter, retried, first_frame); null = inject.</summary>
+    public static string? FaultIgnoredReason(bool adapterApplied, bool retried, bool firstFrameRaised)
+    {
+        if (!adapterApplied)
+        {
+            return "no_policy_adapter";
+        }
+
+        if (retried)
+        {
+            return "retried";
+        }
+
+        return firstFrameRaised ? "first_frame" : null;
+    }
 
     /// <summary>First existing diag-mpv.txt in dirs (no merge). Source: data (index 0) | app (index 1) | none.</summary>
     public static (string? Path, string Source) ResolveFile(IReadOnlyList<string>? dirs, Func<string, bool> exists)
@@ -61,6 +98,7 @@ public static class DiagMpvOptions
         var rejected = new List<KeyValuePair<string, string>>();
         string? policyAdapter = null;
         var policyFaultVo = false;
+        string? policyForce = null;
         foreach (var raw in lines ?? Array.Empty<string>())
         {
             var line = raw?.Trim() ?? "";
@@ -78,11 +116,18 @@ public static class DiagMpvOptions
 
             var key = line[..eq].Trim();
             var value = line[(eq + 1)..].Trim();
-            if (key == PolicyAdapterKey)
+            if (key == PolicyAdapterKey || key == PolicyForceAdapterKey)
             {
                 if (value.Length > 0 && value.Length <= MaxAdapterLength && value.IndexOfAny(new[] { '\r', '\n' }) < 0)
                 {
-                    policyAdapter = value;
+                    if (key == PolicyAdapterKey)
+                    {
+                        policyAdapter = value;
+                    }
+                    else
+                    {
+                        policyForce = value;
+                    }
                 }
                 else
                 {
@@ -122,7 +167,7 @@ public static class DiagMpvOptions
             accepted.Add(new(key, value));
         }
 
-        return new Result(accepted, rejected, policyAdapter, policyFaultVo);
+        return new Result(accepted, rejected, policyAdapter, policyFaultVo, policyForce);
     }
 
     public static bool IsValidValue(string? value) =>

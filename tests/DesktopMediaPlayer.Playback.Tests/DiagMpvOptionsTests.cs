@@ -7,6 +7,60 @@ namespace DesktopMediaPlayer.Playback.Tests;
 // DIAG only: compiled and run with -p:DmpDiag=true.
 public sealed class DiagMpvOptionsTests
 {
+    [Theory]
+    [InlineData(" gpu-policy-force-adapter =  NVIDIA GeForce RTX 4070 ", "NVIDIA GeForce RTX 4070")]
+    [InlineData("gpu-policy-force-adapter=", null)]
+    [InlineData("gpu-policy-force-adapter=a\nb", null)]
+    public void PolicyForceAdapterKey_Parse_NotPassthrough(string line, string? expected)
+    {
+        var r = DiagMpvOptions.Parse(new[] { line });
+        Assert.Equal(expected, r.PolicyForceAdapter);
+        Assert.Null(r.PolicyAdapterOverride);
+        Assert.Empty(r.Accepted);
+        Assert.Equal(expected is null ? 1 : 0, r.Rejected.Count);
+        Assert.Null(DiagMpvOptions.Parse(new[] { "gpu-policy-force-adapter=" + new string('a', 257) }).PolicyForceAdapter);
+    }
+
+    [Fact]
+    public void ApplyForceAdapter_OnlyWhenPolicyNone()
+    {
+        Assert.Equal(new GpuAdapterDecision("NV", "diag_force"), DiagMpvOptions.ApplyForceAdapter(new GpuAdapterDecision(null, "default"), "NV"));
+        var selected = new GpuAdapterDecision("Intel", "selected");
+        Assert.Same(selected, DiagMpvOptions.ApplyForceAdapter(selected, "NV"));
+        var none = new GpuAdapterDecision(null, "default");
+        Assert.Same(none, DiagMpvOptions.ApplyForceAdapter(none, null));
+    }
+
+    [Fact]
+    public void FormatProbe_NamesOnly_OrFailed()
+    {
+        Assert.Equal("default=Intel UHD hp=[NVIDIA RTX,Intel UHD]", DiagMpvOptions.FormatProbe(new[] { "NVIDIA RTX", "Intel UHD" }, "Intel UHD", false));
+        Assert.Equal("default=none hp=[]", DiagMpvOptions.FormatProbe(Array.Empty<string>(), null, false));
+        Assert.Equal("failed=1", DiagMpvOptions.FormatProbe(Array.Empty<string>(), null, true));
+    }
+
+    [Theory]
+    [InlineData("Device Name: NVIDIA GeForce RTX 4070\n", true, "NVIDIA GeForce RTX 4070")]
+    [InlineData("  Device Name:   Intel(R) UHD Graphics  ", true, "Intel(R) UHD Graphics")]
+    [InlineData("Device Name:", false, "")]
+    [InlineData("Driver version: 31.0", false, "")]
+    [InlineData(null, false, "")]
+    public void TryParseDeviceName_MatchesOnlyDeviceLines(string? text, bool ok, string name)
+    {
+        Assert.Equal(ok, DiagMpvOptions.TryParseDeviceName(text, out var parsed));
+        Assert.Equal(name, parsed);
+    }
+
+    [Theory]
+    [InlineData(false, true, true, "no_policy_adapter")]
+    [InlineData(true, true, true, "retried")]
+    [InlineData(true, false, true, "first_frame")]
+    [InlineData(true, false, false, null)]
+    public void FaultIgnoredReason_Priority(bool applied, bool retried, bool firstFrame, string? expected)
+    {
+        Assert.Equal(expected, DiagMpvOptions.FaultIgnoredReason(applied, retried, firstFrame));
+    }
+
     [Fact]
     public void PolicyAdapterKey_AcceptedTrimmed_NotPassthrough_NotD3d11Override()
     {
