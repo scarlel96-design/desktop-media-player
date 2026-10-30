@@ -32,6 +32,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private int _disposeFlag; // S105: atomic Dispose entry guard
     private string? _pendingOpen;
     private int _volume = 100;
+    private string _cscale = CscalePolicy.Lanczos;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
     private const int SeekSlowMs = 500;
@@ -584,6 +585,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         try
         {
             _mpv = MpvNative.mpv_create();
+            _cscale = CscalePolicy.Lanczos;
         }
         catch (DllNotFoundException ex)
         {
@@ -630,6 +632,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_observe_property(_mpv, 1, "pause", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 2, "hwdec-current", MpvFormat.String);
         MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
+        MpvNative.mpv_observe_property(_mpv, 4, "osd-dimensions", MpvFormat.None);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
         LogRenderPath("after_init");
         return true;
@@ -715,6 +718,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 break;
             case MpvEventIds.VideoReconfig:
                 LogUnhandledEvent(evt.event_id);
+                ApplyCscalePolicy();
                 break;
             case MpvEventIds.PlaybackRestart:
                 LogSeekLatency();
@@ -744,6 +748,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         {
             ReportHwdec();
         }
+        else if (string.Equals(name, "osd-dimensions", StringComparison.Ordinal))
+        {
+            ApplyCscalePolicy();
+        }
         else if (string.Equals(name, "pause", StringComparison.Ordinal) && _state is PlaybackState.Playing or PlaybackState.Paused)
         {
             var paused = MpvNative.GetPropertyAndFree(_mpv, "pause");
@@ -761,6 +769,24 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         {
             _logger.Log("info", "eof_reached", $"pos={MpvNative.GetPropertyAndFree(_mpv, "time-pos") ?? "(n/a)"} state={_state}");
         }
+    }
+
+    // A5-b: the only place cscale is set. Re-evaluated on VideoReconfig and window resize (osd-dimensions).
+    private void ApplyCscalePolicy()
+    {
+        int P(string n) => int.TryParse(MpvNative.GetPropertyAndFree(_mpv, n), out var v) ? v : 0;
+        var dispW = P("osd-dimensions/w") - P("osd-dimensions/ml") - P("osd-dimensions/mr");
+        var dispH = P("osd-dimensions/h") - P("osd-dimensions/mt") - P("osd-dimensions/mb");
+        int srcW = P("video-params/w"), srcH = P("video-params/h");
+        var shift = CscalePolicy.ChromaShift(MpvNative.GetPropertyAndFree(_mpv, "video-params/pixelformat"));
+        var next = CscalePolicy.Decide(dispW, dispH, srcW, srcH, shift);
+        if (next == _cscale || MpvNative.mpv_set_property_string(_mpv, "cscale", next) < 0)
+        {
+            return;
+        }
+
+        _logger.Log("info", "cscale_policy", $"from={_cscale} to={next} disp={dispW}x{dispH} chroma={srcW >> shift}x{srcH >> shift}");
+        _cscale = next;
     }
 
     private void MaybeFirstFrame()

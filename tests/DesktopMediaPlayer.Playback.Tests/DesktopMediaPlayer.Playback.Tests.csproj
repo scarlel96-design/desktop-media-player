@@ -15,5 +15,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
     <ProjectReference Include="..\..\src\DesktopMediaPlayer.Playback\DesktopMediaPlayer.Playback.csproj" />
+    <ProjectReference Include="..\..\src\DesktopMediaPlayer.Engine.Mpv\DesktopMediaPlayer.Engine.Mpv.csproj" />
   </ItemGroup>
 </Project>
