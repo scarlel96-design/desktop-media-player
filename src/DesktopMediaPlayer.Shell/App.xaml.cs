@@ -14,6 +14,8 @@ public partial class App : Application
     internal PlaybackFacade? Facade { get; private set; }
     internal IPlaylistService? Playlist { get; private set; }
     internal IResumeStore? ResumeStore { get; private set; }
+    internal string? StartupMediaPath { get; private set; }
+    internal int StartupArgCount { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -37,6 +39,8 @@ public partial class App : Application
         Engine.Observer = Facade;
         Playlist = new MinimalPlaylistService(Facade);
         ResumeStore = new FileResumeStore(Logger);
+        StartupArgCount = e.Args.Length;
+        StartupMediaPath = StartupArgs.FirstMediaPath(e.Args, System.IO.File.Exists);
     }
 
     internal void ApplyColorTheme(bool dark)

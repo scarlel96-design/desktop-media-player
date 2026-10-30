@@ -134,11 +134,29 @@ public partial class MainWindow : Window, IPlaybackObserver
             ShowError(
                 "libmpv-2.dll not found. Place LGPL binaries under native/win-x64 or set DMP_LIBMPV_PATH. "
                 + (detail ?? string.Empty));
+            LogStartupArg(app, opened: false, "probe_failed");
         }
         else
         {
             StatusText.Text = "Ready — open a local media file.";
+            if (app.StartupMediaPath is { } startupPath)
+            {
+                OpenMediaFiles(new[] { startupPath });
+                LogStartupArg(app, opened: true, null);
+            }
+            else
+            {
+                LogStartupArg(app, opened: false, "no_existing_file");
+            }
         }
+    }
+
+    /// <summary>CLI startup arg: one line, extension only (no full path, privacy).</summary>
+    private static void LogStartupArg(App app, bool opened, string? reason)
+    {
+        var ext = app.StartupMediaPath is { } p ? System.IO.Path.GetExtension(p) : string.Empty;
+        var result = opened ? "opened" : $"skipped:{reason}";
+        app.Logger?.Log("info", "startup_args", $"args.count={app.StartupArgCount} result={result} ext={ext}");
     }
 
     private void TryAttachRenderHost()
