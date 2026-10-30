@@ -715,10 +715,6 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Idle);
                 break;
             case MpvEventIds.FileLoaded:
-#if DMP_DIAG
-                // Summary window baseline restarts at each FileLoaded so it matches the seek-script clock.
-                _diagSummaryUtc = DateTime.MinValue;
-#endif
                 SetState(PlaybackState.Playing);
                 break;
             case MpvEventIds.EndFile:
@@ -837,6 +833,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         _firstFrameRaised = true;
+#if DMP_DIAG
+        // Summary window baseline restarts at first frame, the same signal that starts the seek-script runner.
+        _diagSummaryUtc = DateTime.MinValue;
+#endif
         _logger.FirstFrame();
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
