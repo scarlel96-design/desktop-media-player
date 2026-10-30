@@ -35,18 +35,31 @@ public partial class App : Application
                 MessageBoxImage.Error);
         };
 
+        // DATADIR: resolve data root before any store/logger exists; invalid => fail, never fall back.
+        if (!AppDataPaths.TryParseArgs(e.Args, out var dataPaths, out var startupArgs))
+        {
+            Console.Error.WriteLine("[error] data_dir reason=invalid");
+            Environment.Exit(2);
+            return;
+        }
+
+        if (dataPaths is not null)
+        {
+            AppDataPaths.Current = dataPaths;
+        }
+
         Logger = new SpikeLogger();
-        Engine = new MpvPlaybackEngine(Logger, gpuPreference: GpuPrefsStore.Load(), gpuProbe: new DxgiGpuAdapterProbe());
+        Engine = new MpvPlaybackEngine(Logger, gpuPreference: GpuPrefsStore.Load(), gpuProbe: new DxgiGpuAdapterProbe(), cacheDir: AppDataPaths.Current.Cache);
         Facade = new PlaybackFacade(Engine, new LoggingObserver(Logger));
         Facade.RenderHost = Engine.RenderHost;
         Engine.Observer = Facade;
         Playlist = new MinimalPlaylistService(Facade);
         ResumeStore = new FileResumeStore(Logger);
 #if DMP_DIAG
-        var seekScriptPath = DiagSeekScript.ExtractPath(e.Args, out var args);
+        var seekScriptPath = DiagSeekScript.ExtractPath(startupArgs, out var args);
         DiagSeek = LoadDiagSeekScript(seekScriptPath);
 #else
-        System.Collections.Generic.IReadOnlyList<string> args = e.Args;
+        System.Collections.Generic.IReadOnlyList<string> args = startupArgs;
 #endif
         StartupArgCount = args.Count;
         StartupMediaPath = StartupArgs.FirstMediaPath(args, System.IO.File.Exists);

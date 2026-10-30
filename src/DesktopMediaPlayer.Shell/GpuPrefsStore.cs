@@ -17,9 +17,7 @@ internal static class GpuPrefsStore
     {
         get
         {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "desktop-media-player");
+            var dir = DesktopMediaPlayer.Platform.AppDataPaths.Current.Settings;
             Directory.CreateDirectory(dir);
             return Path.Combine(dir, "gpu-prefs.json");
         }

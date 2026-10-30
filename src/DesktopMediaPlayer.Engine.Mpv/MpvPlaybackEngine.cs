@@ -60,8 +60,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 #endif
 
     public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null,
-        GpuPreference? gpuPreference = GpuPreference.Auto, IGpuAdapterProbe? gpuProbe = null)
+        GpuPreference? gpuPreference = GpuPreference.Auto, IGpuAdapterProbe? gpuProbe = null, string? cacheDir = null)
     {
+        _cacheDir = cacheDir;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _gpuPreference = gpuPreference;
         _gpuProbe = gpuProbe;
@@ -69,6 +70,18 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _sync = SynchronizationContext.Current;
         RenderHost = new MpvRenderHost(this);
     }
+
+    private readonly string? _cacheDir;
+
+    /// <summary>DATADIR: mpv cache options rooted at the injected cache dir (none when null).</summary>
+    public static IReadOnlyList<KeyValuePair<string, string>> CacheOptions(string? cacheDir) =>
+        string.IsNullOrEmpty(cacheDir)
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[]
+            {
+                new KeyValuePair<string, string>("gpu-shader-cache-dir", Path.Combine(cacheDir, "shaders")),
+                new KeyValuePair<string, string>("icc-cache-dir", Path.Combine(cacheDir, "icc")),
+            };
 
     public IPlaybackObserver? Observer { get; set; }
 
@@ -643,6 +656,19 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_set_option_string(_mpv, "input-vo-keyboard", "no");
         MpvNative.mpv_set_option_string(_mpv, "terminal", "no");
         MpvNative.mpv_request_log_messages(_mpv, "info");
+        foreach (var opt in CacheOptions(_cacheDir))
+        {
+            try
+            {
+                Directory.CreateDirectory(opt.Value);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.Log("warn", "cache_dir", $"reason={ex.GetType().Name}");
+            }
+
+            MpvNative.mpv_set_option_string(_mpv, opt.Key, opt.Value);
+        }
 #if DMP_DIAG
         var diag = ApplyDiagOptions(); // after the hard-coded options so injected values win
         _gpuDiagOverride = diag.Accepted.Any(p => p.Key == "d3d11-adapter");
