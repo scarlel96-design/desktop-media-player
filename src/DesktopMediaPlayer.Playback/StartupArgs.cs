@@ -19,7 +19,7 @@ public static class StartupArgs
         foreach (var raw in args)
         {
             var arg = raw?.Trim().Trim('"').Trim();
-            if (string.IsNullOrEmpty(arg) || arg[0] == '-' || arg[0] == '/')
+            if (string.IsNullOrEmpty(arg) || arg[0] == '-')
             {
                 continue;
             }
