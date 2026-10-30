@@ -31,7 +31,11 @@ internal static class GpuPrefsStore
         try
         {
             var path = FilePath;
-            if (!File.Exists(path)) return GpuPreference.Auto;
+            if (!File.Exists(path))
+            {
+                return GpuPreference.Auto;
+            }
+
             var dto = JsonSerializer.Deserialize<PrefsDto>(File.ReadAllText(path), JsonOptions);
             return GpuAdapterPolicy.ParsePreference(dto?.Value);
         }

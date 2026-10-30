@@ -42,7 +42,11 @@ public static class GpuAdapterPolicy
     /// <summary>Missing/empty -> Auto; unknown value -> null (invalid_pref).</summary>
     public static GpuPreference? ParsePreference(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return GpuPreference.Auto;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return GpuPreference.Auto;
+        }
+
         return Enum.TryParse<GpuPreference>(value.Trim(), ignoreCase: true, out var p) && Enum.IsDefined(p) ? p : null;
     }
 }

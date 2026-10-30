@@ -3,7 +3,13 @@ using DesktopMediaPlayer.Contracts;
 namespace DesktopMediaPlayer.Engine.Mpv;
 
 /// <summary>A5-a: Vo = end_file error -15 (retryable); VoTimeout = vo-configured not true within 3s (log only); Media = other end_file errors.</summary>
-public enum GpuFailureStage { None, Vo, VoTimeout, Media }
+public enum GpuFailureStage
+{
+    None,
+    Vo,
+    VoTimeout,
+    Media
+}
 
 /// <summary>A5-a: pure one-shot fallback rule for a forced d3d11-adapter.</summary>
 public static class GpuFallbackPolicy
