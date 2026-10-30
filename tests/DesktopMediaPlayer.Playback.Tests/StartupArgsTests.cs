@@ -25,7 +25,7 @@ public sealed class StartupArgsTests
     [Fact]
     public void SwitchesOnly_ReturnsNull()
     {
-        Assert.Null(StartupArgs.FirstMediaPath(new[] { "-v", "/safe", "--log" }, _ => false));
+        Assert.Null(StartupArgs.FirstMediaPath(new[] { "-v", "/safe", "--log" }, p => !p.EndsWith("safe")));
     }
 
     [Fact]
