@@ -36,7 +36,7 @@ public partial class App : Application
         };
 
         Logger = new SpikeLogger();
-        Engine = new MpvPlaybackEngine(Logger);
+        Engine = new MpvPlaybackEngine(Logger, gpuPreference: GpuPrefsStore.Load(), gpuProbe: new DxgiGpuAdapterProbe());
         Facade = new PlaybackFacade(Engine, new LoggingObserver(Logger));
         Facade.RenderHost = Engine.RenderHost;
         Engine.Observer = Facade;

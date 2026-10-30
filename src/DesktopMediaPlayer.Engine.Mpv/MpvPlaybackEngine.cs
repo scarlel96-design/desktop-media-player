@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using DesktopMediaPlayer.Contracts;
 using DesktopMediaPlayer.Engine.Mpv.Native;
 using DesktopMediaPlayer.Platform;
+using DesktopMediaPlayer.Playback;
 
 namespace DesktopMediaPlayer.Engine.Mpv;
 
@@ -33,6 +34,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private string? _pendingOpen;
     private int _volume = 100;
     private string _cscale = CscalePolicy.Lanczos;
+    private readonly GpuPreference? _gpuPreference; // A5-a: null = invalid stored value (behaves as Auto)
+    private readonly IGpuAdapterProbe? _gpuProbe;
+    private bool _gpuAdapterApplied;
+    private bool _gpuRetried;
+    private bool _gpuDiagOverride; // only ever set under DMP_DIAG
+    private long _loadGeneration; // A5-a: bumped by Open/Stop/Close/Dispose/retry; stale vo-configured timeouts are ignored
+    private long _voDeadlineGeneration;
+    private DateTime _voDeadlineUtc = DateTime.MaxValue;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
     private const int SeekSlowMs = 500;
@@ -51,9 +60,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private TimeSpan _diagSummaryCpu;
 #endif
 
-    public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null)
+    public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null,
+        GpuPreference? gpuPreference = GpuPreference.Auto, IGpuAdapterProbe? gpuProbe = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _gpuPreference = gpuPreference;
+        _gpuProbe = gpuProbe;
         Observer = observer;
         _sync = SynchronizationContext.Current;
         RenderHost = new MpvRenderHost(this);
@@ -80,6 +92,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     {
         _pendingOpen = path;
         _firstFrameRaised = false;
+        CancelVoTimer();
         _seekRequestTs = 0;
         ResetDropBaselines();
         SetState(PlaybackState.Opening);
@@ -103,6 +116,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     public void Close() => Post(() =>
     {
         _pendingOpen = null;
+        CancelVoTimer();
         if (_mpv != nint.Zero)
         {
             Check(MpvNative.mpv_command_string(_mpv, "stop"), "stop");
@@ -136,6 +150,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     public void Stop() => Post(() =>
     {
         _seekRequestTs = 0;
+        CancelVoTimer();
         if (_mpv == nint.Zero)
         {
             return;
@@ -499,6 +514,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         _disposed = true;
+        Interlocked.Increment(ref _loadGeneration);
         _cts.Cancel();
         _wake.Set();
         if (_thread is { IsAlive: true } && Thread.CurrentThread != _thread)
@@ -565,6 +581,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 }
 
                 PumpEvents();
+                CheckVoConfiguredTimeout();
                 MaybeLogPeriodicMetrics();
                 _wake.WaitOne(50);
             }
@@ -629,7 +646,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_request_log_messages(_mpv, "info");
 #if DMP_DIAG
         var diag = ApplyDiagOptions(); // after the hard-coded options so injected values win
+        _gpuDiagOverride = diag.Accepted.Any(p => p.Key == "d3d11-adapter");
 #endif
+        ApplyGpuPolicy();
 
         var init = MpvNative.mpv_initialize(_mpv);
         if (init < 0)
@@ -716,12 +735,18 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 break;
             case MpvEventIds.FileLoaded:
                 SetState(PlaybackState.Playing);
+                ArmVoConfiguredTimeout();
                 break;
             case MpvEventIds.EndFile:
                 // S103: map END_FILE by reason; error -> Error, eof/unknown -> Ended, stop/quit/redirect keep state.
                 var end = LogEndFile(evt.data);
                 if (end is { reason: 4 } failed)
                 {
+                    if (TryGpuFallback(GpuFallbackPolicy.StageForEndFileError(failed.error)))
+                    {
+                        break;
+                    }
+
                     RaiseError("playback.end_error", MpvNative.GetErrorString(failed.error), recoverable: true);
                     SetState(PlaybackState.Error);
                 }
@@ -823,6 +848,86 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         _logger.Log("info", "cscale_policy", $"from={_cscale} to={next} disp={dispW}x{dispH} chroma={chroma}");
         _cscale = next;
+    }
+
+    // A5-a: the only place d3d11-adapter is set by policy (pre-init). A DIAG d3d11-adapter disables the policy.
+    private void ApplyGpuPolicy()
+    {
+        var pref = _gpuPreference?.ToString() ?? "invalid";
+#if DMP_DIAG
+        if (_gpuDiagOverride)
+        {
+            _logger.Log("info", "gpu_policy", $"pref={pref} adapter=none reason=diag_override");
+            return;
+        }
+#endif
+
+        var probe = _gpuPreference == GpuPreference.HighPerformance ? _gpuProbe?.Probe() ?? GpuAdapterList.ProbeFailed : GpuAdapterList.ProbeFailed;
+        var decision = GpuAdapterPolicy.Decide(_gpuPreference, probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed);
+        if (decision.Adapter is not null)
+        {
+            _gpuAdapterApplied = MpvNative.mpv_set_option_string(_mpv, "d3d11-adapter", decision.Adapter) >= 0;
+        }
+
+        _logger.Log("info", "gpu_policy", $"pref={pref} adapter={decision.Adapter ?? "none"} reason={decision.Reason}");
+    }
+
+    private void CancelVoTimer()
+    {
+        Interlocked.Increment(ref _loadGeneration);
+        _voDeadlineUtc = DateTime.MaxValue;
+    }
+
+    private void ArmVoConfiguredTimeout()
+    {
+        if (!_gpuAdapterApplied || _mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var vid = MpvNative.GetPropertyAndFree(_mpv, "vid");
+        if (string.IsNullOrEmpty(vid) || string.Equals(vid, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _voDeadlineGeneration = Interlocked.Read(ref _loadGeneration);
+        _voDeadlineUtc = DateTime.UtcNow + GpuFallbackPolicy.VoConfiguredTimeout;
+    }
+
+    private void CheckVoConfiguredTimeout()
+    {
+        if (_voDeadlineUtc == DateTime.MaxValue || DateTime.UtcNow < _voDeadlineUtc)
+        {
+            return;
+        }
+
+        _voDeadlineUtc = DateTime.MaxValue;
+        if (_mpv == nint.Zero || !GpuFallbackPolicy.IsTimeoutCurrent(_voDeadlineGeneration, Interlocked.Read(ref _loadGeneration))
+            || string.Equals(MpvNative.GetPropertyAndFree(_mpv, "vo-configured"), "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        TryGpuFallback(GpuFailureStage.Vo);
+    }
+
+    private bool TryGpuFallback(GpuFailureStage stage)
+    {
+        if (!_gpuAdapterApplied || _pendingOpen is null || _mpv == nint.Zero
+            || !GpuFallbackPolicy.ShouldRetry(_gpuPreference, stage, _gpuRetried, _firstFrameRaised, _gpuDiagOverride))
+        {
+            return false;
+        }
+
+        _gpuRetried = true;
+        _gpuAdapterApplied = false;
+        _logger.Log("warn", "gpu_policy", "fallback=1 reason=vo_init_failed");
+        MpvNative.mpv_set_property_string(_mpv, "d3d11-adapter", "");
+        CancelVoTimer();
+        SetState(PlaybackState.Opening);
+        LoadFile(_pendingOpen);
+        return true;
     }
 
     private void MaybeFirstFrame()

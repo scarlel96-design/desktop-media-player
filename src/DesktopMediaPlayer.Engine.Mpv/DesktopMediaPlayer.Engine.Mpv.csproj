@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
     <ProjectReference Include="..\DesktopMediaPlayer.Platform\DesktopMediaPlayer.Platform.csproj" />
+    <ProjectReference Include="..\DesktopMediaPlayer.Playback\DesktopMediaPlayer.Playback.csproj" />
   </ItemGroup>
 </Project>
