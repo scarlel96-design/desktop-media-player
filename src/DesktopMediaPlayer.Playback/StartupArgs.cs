@@ -9,7 +9,7 @@ public static class StartupArgs
 {
     /// <summary>
     /// Returns the full path of the first existing file argument, or null.
-    /// Outer quotes are trimmed, switches ("-x" / "/x") are skipped, relative paths are made absolute.
+    /// Outer quotes are trimmed, "-" switches are skipped ("/" args are checked via fileExists), relative paths are made absolute.
     /// </summary>
     public static string? FirstMediaPath(IReadOnlyList<string> args, Func<string, bool> fileExists)
     {
