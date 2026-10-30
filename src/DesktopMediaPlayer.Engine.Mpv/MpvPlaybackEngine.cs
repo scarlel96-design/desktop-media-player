@@ -57,6 +57,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private DateTime _diagSummaryUtc = DateTime.MinValue;
     private long? _diagSummaryDrop;
     private TimeSpan _diagSummaryCpu;
+    private string? _diagPolicyAdapter; // gpu-policy-adapter-override (policy only, not an mpv option)
 #endif
 
     public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null,
@@ -664,6 +665,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 #if DMP_DIAG
         var diag = ApplyDiagOptions(); // after the hard-coded options so injected values win
         _gpuDiagOverride = diag.Accepted.Any(p => p.Key == "d3d11-adapter");
+        _diagPolicyAdapter = diag.PolicyAdapterOverride;
 #endif
         ApplyGpuPolicy();
 
@@ -881,6 +883,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         var probe = _gpuPreference == GpuPreference.HighPerformance ? _gpuProbe?.Probe() ?? GpuAdapterList.ProbeFailed : GpuAdapterList.ProbeFailed;
         var decision = GpuAdapterPolicy.Decide(_gpuPreference, probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed);
+#if DMP_DIAG
+        // HighPerformance only (the only pref ShouldRetry accepts): adapter replaced, fallback/retry path unchanged.
+        if (_diagPolicyAdapter is not null && _gpuPreference == GpuPreference.HighPerformance)
+        {
+            decision = new GpuAdapterDecision(_diagPolicyAdapter, "diag_policy_override");
+        }
+#endif
         if (decision.Adapter is not null)
         {
             _gpuAdapterApplied = MpvNative.mpv_set_option_string(_mpv, "d3d11-adapter", decision.Adapter) >= 0;
@@ -1046,7 +1055,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private DiagMpvOptions.Result ApplyDiagOptions()
     {
         _diagAppliedKeys.Clear();
-        var path = Path.Combine(AppContext.BaseDirectory, DiagMpvOptions.FileName);
+        var (path, source) = DiagMpvOptions.ResolveFile(AppDataPaths.Current.Root, AppContext.BaseDirectory, File.Exists);
+        _logger.Log("info", "diag_opts", $"source={source} path={PathMask.Mask(path)}");
         string[] lines;
         try
         {

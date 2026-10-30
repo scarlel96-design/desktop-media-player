@@ -16,15 +16,32 @@ public static class DiagMpvOptions
     public static readonly IReadOnlyList<string> AllowedKeys =
         new[] { "dither-depth", "dither", "d3d11-adapter", "scale", "cscale", "dscale", "hwdec" };
 
+    /// <summary>Policy-only key: replaces the GPU policy's adapter; never passed to mpv, never a d3d11-adapter override.</summary>
+    public const string PolicyAdapterKey = "gpu-policy-adapter-override";
+
     public sealed record Result(
         IReadOnlyList<KeyValuePair<string, string>> Accepted,
-        IReadOnlyList<KeyValuePair<string, string>> Rejected);
+        IReadOnlyList<KeyValuePair<string, string>> Rejected,
+        string? PolicyAdapterOverride = null);
+
+    /// <summary>diag-mpv.txt lookup: data root first, then exe dir. Source: data | exe | none.</summary>
+    public static (string Path, string Source) ResolveFile(string? rootDir, string exeDir, Func<string, bool> exists)
+    {
+        if (!string.IsNullOrEmpty(rootDir) && exists(System.IO.Path.Combine(rootDir, FileName)))
+        {
+            return (System.IO.Path.Combine(rootDir, FileName), "data");
+        }
+
+        var exePath = System.IO.Path.Combine(exeDir, FileName);
+        return (exePath, exists(exePath) ? "exe" : "none");
+    }
 
     /// <summary>Rejected reasons: format (no key=value), not_allowed (key outside allowlist), bad_value. Duplicate key: last wins.</summary>
     public static Result Parse(IEnumerable<string>? lines)
     {
         var accepted = new List<KeyValuePair<string, string>>();
         var rejected = new List<KeyValuePair<string, string>>();
+        string? policyAdapter = null;
         foreach (var raw in lines ?? Array.Empty<string>())
         {
             var line = raw?.Trim() ?? "";
@@ -42,6 +59,20 @@ public static class DiagMpvOptions
 
             var key = line[..eq].Trim();
             var value = line[(eq + 1)..].Trim();
+            if (key == PolicyAdapterKey)
+            {
+                if (IsValidValue(value.Replace(' ', '_').Replace('(', '_').Replace(')', '_')))
+                {
+                    policyAdapter = value;
+                }
+                else
+                {
+                    rejected.Add(new(key, "bad_value"));
+                }
+
+                continue;
+            }
+
             if (!AllowedKeys.Contains(key, StringComparer.Ordinal))
             {
                 rejected.Add(new(key.Length > MaxValueLength ? key[..MaxValueLength] : key, "not_allowed"));
@@ -58,7 +89,7 @@ public static class DiagMpvOptions
             accepted.Add(new(key, value));
         }
 
-        return new Result(accepted, rejected);
+        return new Result(accepted, rejected, policyAdapter);
     }
 
     public static bool IsValidValue(string? value) =>
