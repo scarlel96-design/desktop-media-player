@@ -908,7 +908,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             return;
         }
 
-        TryGpuFallback(GpuFailureStage.Vo);
+        // Diagnostic only: a timeout never retries (only end_file error -15 does). Deadline is cleared above, so this logs once.
+        _logger.Log("warn", "gpu_policy", "vo_timeout=1 retry=0");
     }
 
     private bool TryGpuFallback(GpuFailureStage stage)
@@ -923,16 +924,6 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _gpuAdapterApplied = false;
         _logger.Log("warn", "gpu_policy", "fallback=1 reason=vo_init_failed");
         MpvNative.mpv_set_property_string(_mpv, "d3d11-adapter", "");
-        // Re-set vo to its current value so mpv recreates the VO with the cleared adapter (it may still exist after a timeout).
-        var vo = MpvNative.GetPropertyAndFree(_mpv, "vo");
-        if (!string.IsNullOrEmpty(vo))
-        {
-            var rc = MpvNative.mpv_set_property_string(_mpv, "vo", vo);
-            if (rc < 0)
-            {
-                _logger.Log("warn", "gpu_policy", $"vo_reset_failed error={MpvNative.GetErrorString(rc)}");
-            }
-        }
         CancelVoTimer();
         SetState(PlaybackState.Opening);
         LoadFile(_pendingOpen);

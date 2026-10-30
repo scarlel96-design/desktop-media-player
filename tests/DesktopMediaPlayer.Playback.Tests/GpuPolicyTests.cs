@@ -36,6 +36,7 @@ public sealed class GpuPolicyTests
     [InlineData(GpuPreference.Auto, GpuFailureStage.Vo, false, false, false)]
     [InlineData(GpuPreference.HighPerformance, GpuFailureStage.Vo, true, false, false)]
     [InlineData(GpuPreference.HighPerformance, GpuFailureStage.None, false, false, false)]
+    [InlineData(GpuPreference.HighPerformance, GpuFailureStage.VoTimeout, false, false, false)]
     [InlineData(GpuPreference.HighPerformance, GpuFailureStage.Vo, false, true, false)]
     public void ShouldRetry_Cases(GpuPreference pref, GpuFailureStage stage, bool retried, bool firstFrame, bool expected) =>
         Assert.Equal(expected, GpuFallbackPolicy.ShouldRetry(pref, stage, retried, firstFrame, diagOverride: false));

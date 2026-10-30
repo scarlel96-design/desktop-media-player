@@ -44,11 +44,8 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
                 return GpuAdapterList.ProbeFailed;
             }
 
-            string? defaultAdapter = null;
-            if (Vt<EnumAdapters1Fn>(factory, VtEnumAdapters1)(factory, 0, out var first) >= 0 && first != 0)
-            {
-                defaultAdapter = DescribeAndRelease(first);
-            }
+            var defaultAdapter = Vt<EnumAdapters1Fn>(factory, VtEnumAdapters1)(factory, 0, out var first) >= 0 && first != 0
+                ? DescribeAndRelease(first) : null;
 
             var iid6 = IidFactory6;
             if (Marshal.QueryInterface(factory, ref iid6, out factory6) < 0 || factory6 == 0)
@@ -65,30 +62,16 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
                     break; // DXGI_ERROR_NOT_FOUND ends the enumeration
                 }
 
-                var desc = DescribeAndRelease(adapter);
-                if (!string.IsNullOrEmpty(desc))
-                {
-                    list.Add(desc);
-                }
+                if (DescribeAndRelease(adapter) is { Length: > 0 } desc) list.Add(desc);
             }
 
             return new GpuAdapterList(list, defaultAdapter, false);
         }
-        catch (Exception)
-        {
-            return GpuAdapterList.ProbeFailed;
-        }
+        catch (Exception) { return GpuAdapterList.ProbeFailed; }
         finally
         {
-            if (factory6 != 0)
-            {
-                Marshal.Release(factory6);
-            }
-
-            if (factory != 0)
-            {
-                Marshal.Release(factory);
-            }
+            if (factory6 != 0) Marshal.Release(factory6);
+            if (factory != 0) Marshal.Release(factory);
         }
     }
 
