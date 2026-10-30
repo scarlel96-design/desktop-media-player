@@ -21,8 +21,8 @@ public sealed class DiagMpvOptionsTests
     [Theory]
     [InlineData("gpu-policy-adapter-override=")]
     [InlineData("gpu-policy-adapter-override=  ")]
-    [InlineData("gpu-policy-adapter-override=a;b")]
-    public void PolicyAdapterKey_BadValue_Rejected(string line)
+    [InlineData("gpu-policy-adapter-override=a\nb")]
+    public void PolicyAdapterKey_EmptyOrMultiLine_Rejected(string line)
     {
         var r = DiagMpvOptions.Parse(new[] { line });
         Assert.Null(r.PolicyAdapterOverride);
@@ -30,13 +30,48 @@ public sealed class DiagMpvOptionsTests
     }
 
     [Fact]
-    public void ResolveFile_DataRootFirst_ThenExe_ThenNone()
+    public void PolicyAdapterKey_LengthLimit256()
     {
-        var data = System.IO.Path.Combine("root", DiagMpvOptions.FileName);
-        var exe = System.IO.Path.Combine("exe", DiagMpvOptions.FileName);
-        Assert.Equal((data, "data"), DiagMpvOptions.ResolveFile("root", "exe", _ => true));
-        Assert.Equal((exe, "exe"), DiagMpvOptions.ResolveFile("root", "exe", p => p == exe));
-        Assert.Equal((exe, "none"), DiagMpvOptions.ResolveFile(null, "exe", _ => false));
+        Assert.Equal(256, DiagMpvOptions.Parse(new[] { "gpu-policy-adapter-override=" + new string('a', 256) }).PolicyAdapterOverride?.Length);
+        Assert.Null(DiagMpvOptions.Parse(new[] { "gpu-policy-adapter-override=" + new string('a', 257) }).PolicyAdapterOverride);
+    }
+
+    [Theory]
+    [InlineData("data", "data")]
+    [InlineData("app", "app")]
+    [InlineData("none", "none")]
+    public void ResolveFile_FirstExistingOnly_DataThenApp(string existing, string expectedSource)
+    {
+        var dirs = new[] { "data", "app" };
+        var (path, source) = DiagMpvOptions.ResolveFile(dirs, p => p.StartsWith(existing) || (existing == "data" && p.StartsWith("app")));
+        Assert.Equal(expectedSource, source);
+        Assert.Equal(existing == "none" ? null : System.IO.Path.Combine(existing, DiagMpvOptions.FileName), path);
+    }
+
+    [Fact]
+    public void ApplyAdapterOverride_ReplacesOnlyPolicyAdapter()
+    {
+        var applied = DiagMpvOptions.ApplyAdapterOverride(new GpuAdapterDecision("Intel", "selected"), "NVIDIA X");
+        Assert.Equal(new GpuAdapterDecision("NVIDIA X", "diag_policy_override"), applied.Decision);
+        Assert.False(applied.Ignored);
+        var ignored = DiagMpvOptions.ApplyAdapterOverride(new GpuAdapterDecision(null, "default"), "NVIDIA X");
+        Assert.Equal(new GpuAdapterDecision(null, "default"), ignored.Decision);
+        Assert.True(ignored.Ignored);
+        Assert.False(DiagMpvOptions.ApplyAdapterOverride(new GpuAdapterDecision(null, "default"), null).Ignored);
+    }
+
+    [Theory]
+    [InlineData("gpu-policy-fault=vo", true, 0)]
+    [InlineData("gpu-policy-fault=VO", false, 1)]
+    [InlineData("gpu-policy-fault=", false, 1)]
+    [InlineData("gpu-policy-fault=media", false, 1)]
+    public void PolicyFaultKey_OnlyVo_NotPassthrough(string line, bool fault, int rejected)
+    {
+        var r = DiagMpvOptions.Parse(new[] { line });
+        Assert.Equal(fault, r.PolicyFaultVo);
+        Assert.Equal(rejected, r.Rejected.Count);
+        Assert.Empty(r.Accepted);
+        Assert.DoesNotContain(DiagMpvOptions.PolicyFaultKey, DiagMpvOptions.AllowedKeys);
     }
 
     [Fact]

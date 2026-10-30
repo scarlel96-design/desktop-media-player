@@ -58,12 +58,22 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private long? _diagSummaryDrop;
     private TimeSpan _diagSummaryCpu;
     private string? _diagPolicyAdapter; // gpu-policy-adapter-override (policy only, not an mpv option)
+    private bool _diagFaultVo; // gpu-policy-fault=vo (app only)
+    private bool _diagFaultInjected;
+    private readonly IReadOnlyList<string>? _diagSearchDirs;
 #endif
 
     public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null,
-        GpuPreference? gpuPreference = GpuPreference.Auto, IGpuAdapterProbe? gpuProbe = null, string? cacheDir = null)
+        GpuPreference? gpuPreference = GpuPreference.Auto, IGpuAdapterProbe? gpuProbe = null, string? cacheDir = null
+#if DMP_DIAG
+        , IReadOnlyList<string>? diagSearchDirs = null
+#endif
+        )
     {
         _cacheDir = cacheDir;
+#if DMP_DIAG
+        _diagSearchDirs = diagSearchDirs;
+#endif
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _gpuPreference = gpuPreference;
         _gpuProbe = gpuProbe;
@@ -666,6 +676,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var diag = ApplyDiagOptions(); // after the hard-coded options so injected values win
         _gpuDiagOverride = diag.Accepted.Any(p => p.Key == "d3d11-adapter");
         _diagPolicyAdapter = diag.PolicyAdapterOverride;
+        _diagFaultVo = diag.PolicyFaultVo;
 #endif
         ApplyGpuPolicy();
 
@@ -753,6 +764,18 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Idle);
                 break;
             case MpvEventIds.FileLoaded:
+#if DMP_DIAG
+                // gpu-policy-fault=vo: first file-loaded with the policy adapter applied -> one real VO fallback.
+                if (_diagFaultVo && !_diagFaultInjected && _gpuAdapterApplied && !_gpuRetried && !_firstFrameRaised)
+                {
+                    _diagFaultInjected = true;
+                    _logger.Log("warn", "gpu_fault", "fault=injected stage=vo");
+                    if (TryGpuFallback(GpuFailureStage.Vo))
+                    {
+                        break;
+                    }
+                }
+#endif
                 SetState(PlaybackState.Playing);
                 ArmVoConfiguredTimeout();
                 break;
@@ -884,10 +907,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var probe = _gpuPreference == GpuPreference.HighPerformance ? _gpuProbe?.Probe() ?? GpuAdapterList.ProbeFailed : GpuAdapterList.ProbeFailed;
         var decision = GpuAdapterPolicy.Decide(_gpuPreference, probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed);
 #if DMP_DIAG
-        // HighPerformance only (the only pref ShouldRetry accepts): adapter replaced, fallback/retry path unchanged.
-        if (_diagPolicyAdapter is not null && _gpuPreference == GpuPreference.HighPerformance)
+        // Override only replaces an adapter the policy chose; fallback/retry path unchanged.
+        (decision, var overrideIgnored) = DiagMpvOptions.ApplyAdapterOverride(decision, _diagPolicyAdapter);
+        if (overrideIgnored)
         {
-            decision = new GpuAdapterDecision(_diagPolicyAdapter, "diag_policy_override");
+            _logger.Log("info", "gpu_policy", $"pref={pref} reason={decision.Reason} ignored=no_policy_adapter");
         }
 #endif
         if (decision.Adapter is not null)
@@ -1055,12 +1079,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private DiagMpvOptions.Result ApplyDiagOptions()
     {
         _diagAppliedKeys.Clear();
-        var (path, source) = DiagMpvOptions.ResolveFile(AppDataPaths.Current.Root, AppContext.BaseDirectory, File.Exists);
+        var (path, source) = DiagMpvOptions.ResolveFile(_diagSearchDirs, File.Exists);
         _logger.Log("info", "diag_opts", $"source={source} path={PathMask.Mask(path)}");
         string[] lines;
         try
         {
-            lines = File.Exists(path) ? File.ReadAllLines(path) : Array.Empty<string>();
+            lines = path is not null ? File.ReadAllLines(path) : Array.Empty<string>();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

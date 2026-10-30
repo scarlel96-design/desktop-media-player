@@ -49,7 +49,12 @@ public partial class App : Application
         }
 
         Logger = new SpikeLogger();
+#if DMP_DIAG
+        Engine = new MpvPlaybackEngine(Logger, gpuPreference: GpuPrefsStore.Load(), gpuProbe: new DxgiGpuAdapterProbe(), cacheDir: AppDataPaths.Current.Cache,
+            diagSearchDirs: new[] { AppDataPaths.Current.Root, AppContext.BaseDirectory });
+#else
         Engine = new MpvPlaybackEngine(Logger, gpuPreference: GpuPrefsStore.Load(), gpuProbe: new DxgiGpuAdapterProbe(), cacheDir: AppDataPaths.Current.Cache);
+#endif
         Facade = new PlaybackFacade(Engine, new LoggingObserver(Logger));
         Facade.RenderHost = Engine.RenderHost;
         Engine.Observer = Facade;

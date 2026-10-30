@@ -18,22 +18,40 @@ public static class DiagMpvOptions
 
     /// <summary>Policy-only key: replaces the GPU policy's adapter; never passed to mpv, never a d3d11-adapter override.</summary>
     public const string PolicyAdapterKey = "gpu-policy-adapter-override";
+    public const int MaxAdapterLength = 256;
+
+    /// <summary>App-only key: gpu-policy-fault=vo injects one VO failure into the real fallback path.</summary>
+    public const string PolicyFaultKey = "gpu-policy-fault";
 
     public sealed record Result(
         IReadOnlyList<KeyValuePair<string, string>> Accepted,
         IReadOnlyList<KeyValuePair<string, string>> Rejected,
-        string? PolicyAdapterOverride = null);
+        string? PolicyAdapterOverride = null,
+        bool PolicyFaultVo = false);
 
-    /// <summary>diag-mpv.txt lookup: data root first, then exe dir. Source: data | exe | none.</summary>
-    public static (string Path, string Source) ResolveFile(string? rootDir, string exeDir, Func<string, bool> exists)
+    /// <summary>First existing diag-mpv.txt in dirs (no merge). Source: data (index 0) | app (index 1) | none.</summary>
+    public static (string? Path, string Source) ResolveFile(IReadOnlyList<string>? dirs, Func<string, bool> exists)
     {
-        if (!string.IsNullOrEmpty(rootDir) && exists(System.IO.Path.Combine(rootDir, FileName)))
+        for (var i = 0; i < Math.Min(dirs?.Count ?? 0, 2); i++)
         {
-            return (System.IO.Path.Combine(rootDir, FileName), "data");
+            if (!string.IsNullOrEmpty(dirs![i]) && exists(System.IO.Path.Combine(dirs[i], FileName)))
+            {
+                return (System.IO.Path.Combine(dirs[i], FileName), i == 0 ? "data" : "app");
+            }
         }
 
-        var exePath = System.IO.Path.Combine(exeDir, FileName);
-        return (exePath, exists(exePath) ? "exe" : "none");
+        return (null, "none");
+    }
+
+    /// <summary>Override replaces the adapter only when the policy set one; Ignored = override present but no policy adapter.</summary>
+    public static (GpuAdapterDecision Decision, bool Ignored) ApplyAdapterOverride(GpuAdapterDecision decision, string? adapterOverride)
+    {
+        if (adapterOverride is null)
+        {
+            return (decision, false);
+        }
+
+        return decision.Adapter is null ? (decision, true) : (new GpuAdapterDecision(adapterOverride, "diag_policy_override"), false);
     }
 
     /// <summary>Rejected reasons: format (no key=value), not_allowed (key outside allowlist), bad_value. Duplicate key: last wins.</summary>
@@ -42,6 +60,7 @@ public static class DiagMpvOptions
         var accepted = new List<KeyValuePair<string, string>>();
         var rejected = new List<KeyValuePair<string, string>>();
         string? policyAdapter = null;
+        var policyFaultVo = false;
         foreach (var raw in lines ?? Array.Empty<string>())
         {
             var line = raw?.Trim() ?? "";
@@ -61,9 +80,23 @@ public static class DiagMpvOptions
             var value = line[(eq + 1)..].Trim();
             if (key == PolicyAdapterKey)
             {
-                if (IsValidValue(value.Replace(' ', '_').Replace('(', '_').Replace(')', '_')))
+                if (value.Length > 0 && value.Length <= MaxAdapterLength && value.IndexOfAny(new[] { '\r', '\n' }) < 0)
                 {
                     policyAdapter = value;
+                }
+                else
+                {
+                    rejected.Add(new(key, "bad_value"));
+                }
+
+                continue;
+            }
+
+            if (key == PolicyFaultKey)
+            {
+                if (value == "vo")
+                {
+                    policyFaultVo = true;
                 }
                 else
                 {
@@ -89,7 +122,7 @@ public static class DiagMpvOptions
             accepted.Add(new(key, value));
         }
 
-        return new Result(accepted, rejected, policyAdapter);
+        return new Result(accepted, rejected, policyAdapter, policyFaultVo);
     }
 
     public static bool IsValidValue(string? value) =>
