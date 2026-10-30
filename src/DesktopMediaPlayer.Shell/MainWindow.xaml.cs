@@ -1238,7 +1238,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             target = Math.Max(0, target);
         }
 
-        _facade.Seek(target);
+        _facade.SeekRelative(target - position, SeekPrecision.Keyframe);
         ShowSeekOsd(target, duration);
     }
 

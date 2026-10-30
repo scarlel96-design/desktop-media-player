@@ -155,6 +155,24 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _seekCount += rc >= 0 && _seekRequestTs != 0 ? 1 : 0;
     });
 
+    public void SeekRelative(double deltaSeconds, SeekPrecision precision) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var rc = MpvNative.mpv_command_string(_mpv, string.Create(CultureInfo.InvariantCulture, $"seek {deltaSeconds} {(precision == SeekPrecision.Keyframe ? "relative+keyframes" : "relative+exact")}"));
+        Check(rc, "seek");
+        if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
+        {
+            _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+            _seekCount = 0;
+        }
+
+        _seekCount += rc >= 0 && _seekRequestTs != 0 ? 1 : 0;
+    });
+
     public void SetVolume(int volume) => Post(() =>
     {
         _volume = Math.Clamp(volume, 0, 100);
