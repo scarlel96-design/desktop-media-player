@@ -714,7 +714,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 }
                 break;
             case MpvEventIds.VideoReconfig:
-                MaybeFirstFrame();
+                LogUnhandledEvent(evt.event_id);
                 break;
             case MpvEventIds.PlaybackRestart:
                 LogSeekLatency();
