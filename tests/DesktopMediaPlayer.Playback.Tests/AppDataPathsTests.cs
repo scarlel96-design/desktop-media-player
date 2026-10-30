@@ -101,6 +101,17 @@ public sealed class AppDataPathsTests
     }
 
     [Fact]
+    public void MaskText_ReplacesAppBaseDir_EvenInsideUserProfile()
+    {
+        var user = Path.Combine(Path.GetTempPath(), "FakeUser");
+        var app = Path.Combine(user, "Apps", "dmp") + Path.DirectorySeparatorChar;
+        var p = new AppDataPaths(Path.Combine(user, "AppData", "dmp"));
+        var message = "native_loaded " + Path.Combine(app.ToUpperInvariant(), "libmpv-2.dll");
+        var masked = PathMask.MaskText(message, p, user, app);
+        Assert.Equal("native_loaded <app>" + Path.DirectorySeparatorChar + "libmpv-2.dll", masked);
+    }
+
+    [Fact]
     public void NonexistentPath_IsCreated()
     {
         var dir = Path.Combine(NewTemp(), "nested");

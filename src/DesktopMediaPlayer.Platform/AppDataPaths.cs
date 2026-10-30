@@ -85,7 +85,7 @@ public sealed class AppDataPaths
 public static class PathMask
 {
     /// <summary>Free text (e.g. ex.Message): data root -> "&lt;data&gt;", user profile -> "&lt;user&gt;" (case-insensitive).</summary>
-    public static string MaskText(string? text, AppDataPaths? paths = null, string? userProfile = null)
+    public static string MaskText(string? text, AppDataPaths? paths = null, string? userProfile = null, string? appBaseDir = null)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -93,9 +93,21 @@ public static class PathMask
         }
 
         var root = Path.TrimEndingDirectorySeparator((paths ?? AppDataPaths.Current).Root);
+        var app = Path.TrimEndingDirectorySeparator(appBaseDir ?? AppContext.BaseDirectory);
         var user = Path.TrimEndingDirectorySeparator(userProfile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        var result = root.Length > 0 ? text.Replace(root, "<data>", StringComparison.OrdinalIgnoreCase) : text;
-        return user.Length > 0 ? result.Replace(user, "<user>", StringComparison.OrdinalIgnoreCase) : result;
+        // Most specific first: data root and app dir (longer prefix wins if nested), then user profile.
+        var first = root.Length >= app.Length ? (root, "<data>") : (app, "<app>");
+        var second = root.Length >= app.Length ? (app, "<app>") : (root, "<data>");
+        var result = text;
+        foreach (var (prefix, token) in new[] { first, second, (user, "<user>") })
+        {
+            if (prefix.Length > 0)
+            {
+                result = result.Replace(prefix, token, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        return result;
     }
 
     public static string Mask(string? path, AppDataPaths? paths = null)
