@@ -715,6 +715,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Idle);
                 break;
             case MpvEventIds.FileLoaded:
+#if DMP_DIAG
+                // Summary window baseline restarts at each FileLoaded so it matches the seek-script clock.
+                _diagSummaryUtc = DateTime.MinValue;
+#endif
                 SetState(PlaybackState.Playing);
                 break;
             case MpvEventIds.EndFile:
