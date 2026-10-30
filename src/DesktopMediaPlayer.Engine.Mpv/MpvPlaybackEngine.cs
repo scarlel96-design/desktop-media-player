@@ -42,6 +42,14 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private long? _prevDecoderDrop;
     private long? _prevVoDrop;
     private DateTime _prevDropSampleUtc = DateTime.MinValue;
+#if DMP_DIAG
+    // DIAG only: keys injected from diag-mpv.txt, and the 10 s summary window.
+    private readonly List<string> _diagAppliedKeys = new();
+    private static readonly TimeSpan DiagSummaryInterval = TimeSpan.FromSeconds(10);
+    private DateTime _diagSummaryUtc = DateTime.MinValue;
+    private long? _diagSummaryDrop;
+    private TimeSpan _diagSummaryCpu;
+#endif
 
     public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null)
     {
@@ -619,6 +627,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_set_option_string(_mpv, "input-vo-keyboard", "no");
         MpvNative.mpv_set_option_string(_mpv, "terminal", "no");
         MpvNative.mpv_request_log_messages(_mpv, "info");
+#if DMP_DIAG
+        var diag = ApplyDiagOptions(); // after the hard-coded options so injected values win
+#endif
 
         var init = MpvNative.mpv_initialize(_mpv);
         if (init < 0)
@@ -634,6 +645,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 4, "osd-dimensions", MpvFormat.None);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
+#if DMP_DIAG
+        LogDiagOptions(diag);
+#endif
         LogRenderPath("after_init");
         return true;
     }
@@ -784,6 +798,17 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var shift = CscalePolicy.ChromaShift(CscalePolicy.EffectivePixelFormat(hwFmt, swFmt));
         var next = CscalePolicy.Decide(dispW, dispH, srcW, srcH, shift);
         var chroma = $"{CscalePolicy.ChromaSize(srcW, shift)}x{CscalePolicy.ChromaSize(srcH, shift)}";
+#if DMP_DIAG
+        if (DiagMpvOptions.OverridesCscale(_diagAppliedKeys))
+        {
+            if (logDecision)
+            {
+                _logger.Log("info", "cscale_decision", $"decision=diag_override policy={next} cscale={MpvNative.GetPropertyAndFree(_mpv, "cscale") ?? "(n/a)"} override=1");
+            }
+
+            return;
+        }
+#endif
         if (logDecision)
         {
             string G(string n) => MpvNative.GetPropertyAndFree(_mpv, n) ?? "(n/a)";
@@ -885,7 +910,80 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         LogPlaybackMetrics("periodic");
+#if DMP_DIAG
+        MaybeLogDiagSummary(now);
+#endif
     }
+#if DMP_DIAG
+
+    private DiagMpvOptions.Result ApplyDiagOptions()
+    {
+        _diagAppliedKeys.Clear();
+        var path = Path.Combine(AppContext.BaseDirectory, DiagMpvOptions.FileName);
+        string[] lines;
+        try
+        {
+            lines = File.Exists(path) ? File.ReadAllLines(path) : Array.Empty<string>();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.Log("warn", "diag_opts", $"read_error={ex.GetType().Name}");
+            lines = Array.Empty<string>();
+        }
+
+        var result = DiagMpvOptions.Parse(lines);
+        foreach (var (key, value) in result.Accepted)
+        {
+            if (MpvNative.mpv_set_option_string(_mpv, key, value) >= 0)
+            {
+                _diagAppliedKeys.Add(key);
+            }
+        }
+
+        return result;
+    }
+
+    private void LogDiagOptions(DiagMpvOptions.Result result)
+    {
+        var parts = new List<string>();
+        foreach (var (key, value) in result.Accepted)
+        {
+            var applied = _diagAppliedKeys.Contains(key);
+            parts.Add($"{key}=accepted value={value} set={(applied ? "ok" : "failed")} readback={MpvNative.GetPropertyAndFree(_mpv, key) ?? "(n/a)"}");
+        }
+
+        foreach (var (key, reason) in result.Rejected)
+        {
+            parts.Add($"{key}=rejected reason={reason}");
+        }
+
+        _logger.Log("info", "diag_opts", parts.Count == 0 ? "none" : string.Join(" | ", parts));
+    }
+
+    private void MaybeLogDiagSummary(DateTime now)
+    {
+        using var proc = System.Diagnostics.Process.GetCurrentProcess();
+        var cpu = proc.TotalProcessorTime;
+        long? drop = long.TryParse(MpvNative.GetPropertyAndFree(_mpv, "frame-drop-count"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var d) ? d : null;
+        if (_diagSummaryUtc == DateTime.MinValue)
+        {
+            (_diagSummaryUtc, _diagSummaryDrop, _diagSummaryCpu) = (now, drop, cpu);
+            return;
+        }
+
+        var wall = now - _diagSummaryUtc;
+        if (wall < DiagSummaryInterval)
+        {
+            return;
+        }
+
+        double? dropRate = drop is long cur && _diagSummaryDrop is long prev && cur >= prev ? (cur - prev) / wall.TotalSeconds : null;
+        var freshMs = DiagMpvOptions.SumFreshAvgMs(MpvNative.GetPropertyAndFree(_mpv, "vo-passes"));
+        var cpuPct = DiagMpvOptions.CpuPercent(cpu - _diagSummaryCpu, wall, Environment.ProcessorCount);
+        _logger.Log("info", "diag_summary", $"window={DiagMpvOptions.Fmt(wall.TotalSeconds)}s frame-drop-rate={DiagMpvOptions.Fmt(dropRate)}/s fresh-avg-ms={DiagMpvOptions.Fmt(freshMs)} process-cpu={DiagMpvOptions.Fmt(cpuPct)}%");
+        (_diagSummaryUtc, _diagSummaryDrop, _diagSummaryCpu) = (now, drop, cpu);
+    }
+#endif
 
     private void LogPlaybackMetrics(string phase)
     {
