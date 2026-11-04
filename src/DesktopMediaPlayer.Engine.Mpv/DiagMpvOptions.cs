@@ -38,8 +38,19 @@ public static class DiagMpvOptions
         forceAdapter is not null && decision.Adapter is null ? new GpuAdapterDecision(forceAdapter, "diag_force") : decision;
 
     /// <summary>gpu_probe log body: adapter descriptions only.</summary>
-    public static string FormatProbe(IReadOnlyList<string> highPerformanceOrder, string? defaultAdapter, bool failed) =>
-        failed ? "failed=1" : $"default={defaultAdapter ?? "none"} hp=[{string.Join(",", highPerformanceOrder)}]";
+    public static string FormatProbe(IReadOnlyList<string> highPerformanceOrder, string? defaultAdapter, bool failed,
+        IReadOnlyList<string>? highPerformanceVendorIds = null, string? defaultVendorId = null)
+    {
+        if (failed)
+        {
+            return "failed=1";
+        }
+
+        var hp = highPerformanceOrder.Select((name, i) =>
+            $"{name}|vid={(highPerformanceVendorIds is not null && i < highPerformanceVendorIds.Count ? highPerformanceVendorIds[i] : "none")}");
+        var def = defaultAdapter is null ? "none" : $"{defaultAdapter}|vid={defaultVendorId ?? "none"}";
+        return $"default={def} hp=[{string.Join(",", hp)}]";
+    }
 
     /// <summary>Extracts the value after "Device Name:" from an mpv d3d11 log line.</summary>
     public static bool TryParseDeviceName(string? text, out string name)

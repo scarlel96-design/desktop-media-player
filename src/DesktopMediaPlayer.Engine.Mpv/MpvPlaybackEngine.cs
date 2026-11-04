@@ -937,7 +937,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         if (_gpuPreference == GpuPreference.HighPerformance)
         {
-            _logger.Log("info", "gpu_probe", DiagMpvOptions.FormatProbe(probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed));
+            _logger.Log("info", "gpu_probe", DiagMpvOptions.FormatProbe(probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed,
+                probe.DiagHighPerformanceVendorIds, probe.DiagDefaultVendorId));
         }
 
         decision = DiagMpvOptions.ApplyForceAdapter(decision, _diagForceAdapter);

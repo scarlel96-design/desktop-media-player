@@ -32,9 +32,12 @@ public sealed class DiagMpvOptionsTests
     }
 
     [Fact]
-    public void FormatProbe_NamesOnly_OrFailed()
+    public void FormatProbe_DescAndVid_OrFailed()
     {
-        Assert.Equal("default=Intel UHD hp=[NVIDIA RTX,Intel UHD]", DiagMpvOptions.FormatProbe(new[] { "NVIDIA RTX", "Intel UHD" }, "Intel UHD", false));
+        Assert.Equal("default=Intel UHD|vid=8086 hp=[NVIDIA RTX|vid=10de,Intel UHD|vid=8086]",
+            DiagMpvOptions.FormatProbe(new[] { "NVIDIA RTX", "Intel UHD" }, "Intel UHD", false, new[] { "10de", "8086" }, "8086"));
+        Assert.Equal("default=Intel UHD|vid=none hp=[NVIDIA RTX|vid=none]", DiagMpvOptions.FormatProbe(new[] { "NVIDIA RTX" }, "Intel UHD", false));
+        Assert.Equal("default=A|vid=1414 hp=[A|vid=1414,B|vid=none]", DiagMpvOptions.FormatProbe(new[] { "A", "B" }, "A", false, new[] { "1414" }, "1414"));
         Assert.Equal("default=none hp=[]", DiagMpvOptions.FormatProbe(Array.Empty<string>(), null, false));
         Assert.Equal("failed=1", DiagMpvOptions.FormatProbe(Array.Empty<string>(), null, true));
     }

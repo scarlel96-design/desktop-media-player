@@ -6,6 +6,14 @@ namespace DesktopMediaPlayer.Platform;
 public sealed record GpuAdapterList(IReadOnlyList<string> HighPerformanceOrder, string? DefaultAdapter, bool Failed)
 {
     public static readonly GpuAdapterList ProbeFailed = new(Array.Empty<string>(), null, true);
+#if DMP_DIAG
+
+    /// <summary>DIAG only: DXGI_ADAPTER_DESC.VendorId (hex) per <see cref="HighPerformanceOrder"/> entry; not a policy input.</summary>
+    public IReadOnlyList<string> DiagHighPerformanceVendorIds { get; init; } = Array.Empty<string>();
+
+    /// <summary>DIAG only: VendorId (hex) of <see cref="DefaultAdapter"/>; null when unknown.</summary>
+    public string? DiagDefaultVendorId { get; init; }
+#endif
 }
 
 public interface IGpuAdapterProbe
@@ -23,6 +31,11 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
     private static Guid IidFactory1 = new("770aae78-f26f-4dba-a829-253c83d1b387");
     private static readonly Guid IidFactory6 = new("c1b6694f-ff09-44a9-b03c-77900a0a1d17");
     private static Guid IidAdapter1 = new("29038f61-3839-4626-91fd-086879011a05");
+#if DMP_DIAG
+    private const int DiagVendorIdOffset = 256; // DXGI_ADAPTER_DESC.VendorId follows WCHAR[128] Description
+    [ThreadStatic]
+    private static string? s_diagLastVendorId;
+#endif
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int EnumAdapters1Fn(nint self, uint index, out nint adapter);
@@ -49,6 +62,10 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
             {
                 defaultAdapter = DescribeAndRelease(first);
             }
+#if DMP_DIAG
+            var diagDefaultVid = defaultAdapter is null ? null : s_diagLastVendorId;
+            var diagVids = new List<string>();
+#endif
 
             var iid6 = IidFactory6;
             if (Marshal.QueryInterface(factory, ref iid6, out factory6) < 0 || factory6 == 0)
@@ -69,10 +86,17 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
                 if (!string.IsNullOrEmpty(desc))
                 {
                     list.Add(desc);
+#if DMP_DIAG
+                    diagVids.Add(s_diagLastVendorId ?? "none");
+#endif
                 }
             }
 
+#if DMP_DIAG
+            return new GpuAdapterList(list, defaultAdapter, false) { DiagHighPerformanceVendorIds = diagVids, DiagDefaultVendorId = diagDefaultVid };
+#else
             return new GpuAdapterList(list, defaultAdapter, false);
+#endif
         }
         catch (Exception)
         {
@@ -100,7 +124,13 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
         var desc = Marshal.AllocHGlobal(512); // DXGI_ADAPTER_DESC is 304 bytes on x64; Description is WCHAR[128] at offset 0
         try
         {
+#if DMP_DIAG
+            var hr = Vt<GetDescFn>(adapter, VtAdapterGetDesc)(adapter, desc);
+            s_diagLastVendorId = hr < 0 ? null : Marshal.ReadInt32(desc, DiagVendorIdOffset).ToString("x4");
+            return hr < 0 ? null : Marshal.PtrToStringUni(desc, 128).Split('\0')[0];
+#else
             return Vt<GetDescFn>(adapter, VtAdapterGetDesc)(adapter, desc) < 0 ? null : Marshal.PtrToStringUni(desc, 128).Split('\0')[0];
+#endif
         }
         finally
         {
