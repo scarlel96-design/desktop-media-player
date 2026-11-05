@@ -126,7 +126,7 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
         return descriptions.Where(d => KeepHighPerformanceEntry(d, seen)).Select(d => d!).ToList();
     }
 
-    private static bool KeepHighPerformanceEntry(string? desc, HashSet<string> seen) =>
+    private static bool KeepHighPerformanceEntry([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? desc, HashSet<string> seen) =>
         !string.IsNullOrEmpty(desc) && !desc.StartsWith(BasicRenderPrefix, StringComparison.Ordinal) && seen.Add(desc);
 
     private static T Vt<T>(nint com, int slot) where T : Delegate =>
