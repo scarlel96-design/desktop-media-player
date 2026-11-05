@@ -26,7 +26,9 @@ public interface IGpuAdapterProbe
 public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
 {
     private const int VtEnumAdapters1 = 12, VtEnumAdapterByGpuPreference = 29, VtAdapterGetDesc = 8;
-    private const int DxgiGpuPreferenceHighPerformance = 1;
+    /// <summary>DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE (1 is MINIMUM_POWER).</summary>
+    public const int DxgiGpuPreferenceHighPerformance = 2;
+    private const string BasicRenderPrefix = "Microsoft Basic Render";
     private const int MaxAdapters = 16;
     private static Guid IidFactory1 = new("770aae78-f26f-4dba-a829-253c83d1b387");
     private static readonly Guid IidFactory6 = new("c1b6694f-ff09-44a9-b03c-77900a0a1d17");
@@ -74,6 +76,7 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
             }
 
             var list = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             var enumByPref = Vt<EnumByPreferenceFn>(factory6, VtEnumAdapterByGpuPreference);
             for (uint i = 0; i < MaxAdapters; i++)
             {
@@ -83,7 +86,7 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
                 }
 
                 var desc = DescribeAndRelease(adapter);
-                if (!string.IsNullOrEmpty(desc))
+                if (KeepHighPerformanceEntry(desc, seen))
                 {
                     list.Add(desc);
 #if DMP_DIAG
@@ -115,6 +118,16 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
             }
         }
     }
+
+    /// <summary>GPUPOLICY-03: drops Basic Render and Ordinal duplicates, keeping DXGI order.</summary>
+    public static IReadOnlyList<string> NormalizeHighPerformanceOrder(IEnumerable<string?> descriptions)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        return descriptions.Where(d => KeepHighPerformanceEntry(d, seen)).Select(d => d!).ToList();
+    }
+
+    private static bool KeepHighPerformanceEntry(string? desc, HashSet<string> seen) =>
+        !string.IsNullOrEmpty(desc) && !desc.StartsWith(BasicRenderPrefix, StringComparison.Ordinal) && seen.Add(desc);
 
     private static T Vt<T>(nint com, int slot) where T : Delegate =>
         Marshal.GetDelegateForFunctionPointer<T>(Marshal.ReadIntPtr(Marshal.ReadIntPtr(com), slot * nint.Size));
