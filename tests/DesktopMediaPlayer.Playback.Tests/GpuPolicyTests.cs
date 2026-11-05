@@ -9,6 +9,16 @@ public sealed class GpuPolicyTests
     private static readonly string[] Hybrid = { "NVIDIA GeForce RTX 4060 Laptop GPU", "Intel(R) UHD Graphics" };
 
     [Fact]
+    public void HasPrefsKey_ExactKeyOnly()
+    {
+        Assert.True(GpuAdapterPolicy.HasPrefsKey("{\"gpuPreference\":\"Auto\"}"));
+        Assert.False(GpuAdapterPolicy.HasPrefsKey("{}"));
+        Assert.False(GpuAdapterPolicy.HasPrefsKey("{\"GpuPreference\":\"Auto\"}"));
+        Assert.False(GpuAdapterPolicy.HasPrefsKey("[]"));
+        Assert.Equal(GpuPreference.Auto, GpuAdapterPolicy.ParsePreference(null));
+    }
+
+    [Fact]
     public void Decide_Auto_NoAdapter() =>
         Assert.Equal(new GpuAdapterDecision(null, "default"), GpuAdapterPolicy.Decide(GpuPreference.Auto, Hybrid, Hybrid[1]));
 

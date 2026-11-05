@@ -127,6 +127,13 @@ public sealed class AppDataPathsTests
     }
 
     [Fact]
+    public void Mask_NullInput_ReturnsEmpty()
+    {
+        Assert.Equal(string.Empty, PathMask.Mask(null));
+        Assert.Equal(string.Empty, PathMask.MaskText(null));
+    }
+
+    [Fact]
     public void Mask_NeverWritesAbsolutePath()
     {
         var root = NewTemp();

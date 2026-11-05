@@ -40,6 +40,21 @@ public static class GpuAdapterPolicy
     }
 
     /// <summary>Missing/empty -> Auto; unknown value -> null (invalid_pref).</summary>
+    /// <summary>KI-GPUPOLICY-02: true when the prefs JSON object has the exact (case-sensitive) key. Used only for the missing_key log; never changes the preference.</summary>
+    public static bool HasPrefsKey(string json)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                && doc.RootElement.TryGetProperty(PrefsKey, out _);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
     public static GpuPreference? ParsePreference(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

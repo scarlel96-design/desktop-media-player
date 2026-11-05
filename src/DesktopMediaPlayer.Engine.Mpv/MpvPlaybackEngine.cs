@@ -37,7 +37,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private readonly IGpuAdapterProbe? _gpuProbe;
     private bool _gpuAdapterApplied;
     private bool _gpuRetried;
-    private bool _gpuDiagOverride; // only ever set under DMP_DIAG
+    private bool _gpuDiagOverride = false; // only ever set under DMP_DIAG (explicit init: CS0649 in Release)
     private long _loadGeneration; // A5-a: bumped by Open/Stop/Close/Dispose/retry; stale vo-configured timeouts are ignored
     private long _voDeadlineGeneration;
     private DateTime _voDeadlineUtc = DateTime.MaxValue;

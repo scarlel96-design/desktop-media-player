@@ -68,7 +68,7 @@ public sealed class DxgiGpuAdapterProbe : IGpuAdapterProbe
 #endif
 
             var iid6 = IidFactory6;
-            if (Marshal.QueryInterface(factory, ref iid6, out factory6) < 0 || factory6 == 0)
+            if (Marshal.QueryInterface(factory, in iid6, out factory6) < 0 || factory6 == 0)
             {
                 return GpuAdapterList.ProbeFailed; // pre-1803 Windows: no IDXGIFactory6
             }

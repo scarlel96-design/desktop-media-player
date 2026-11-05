@@ -10,6 +10,7 @@ namespace DesktopMediaPlayer.Shell;
 internal static class GpuPrefsStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    private static bool s_missingKeyLogged; // KI-GPUPOLICY-02: log missing_key once per process
 
     private sealed record PrefsDto([property: JsonPropertyName(GpuAdapterPolicy.PrefsKey)] string? Value);
 
@@ -34,7 +35,14 @@ internal static class GpuPrefsStore
                 return GpuPreference.Auto;
             }
 
-            var dto = JsonSerializer.Deserialize<PrefsDto>(File.ReadAllText(path), JsonOptions);
+            var json = File.ReadAllText(path);
+            var dto = JsonSerializer.Deserialize<PrefsDto>(json, JsonOptions);
+            if (!s_missingKeyLogged && !GpuAdapterPolicy.HasPrefsKey(json))
+            {
+                s_missingKeyLogged = true;
+                (System.Windows.Application.Current as App)?.Logger?.Log("info", "gpu_prefs", "reason=missing_key");
+            }
+
             return GpuAdapterPolicy.ParsePreference(dto?.Value);
         }
         catch (Exception ex)
