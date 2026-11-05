@@ -4,8 +4,6 @@
 
 | ID | Sev | Issue | Status |
 |----|-----|-------|--------|
-| KI-031 | Low | 고해상도 영상에서 시크 후 약 1초 끊김 (Known Limitation) | **Open (Known Limitation)** — L1 사용자 관찰 · 정밀(hr) 시크 비용 의심, 원인 미검증(NOT VERIFIED) · PR #1 merge 차단 아님 |
-| KI-030 | Low | 재생바 버퍼링 바 오표시 | **RESOLVED** — Windows PASS 2026-10-22 (`BLD-20261021-PHASEA-S132-001` / `e099c2e`) |
 | KI-029 | Low | F2 전체화면 하단 레터박스 (사용자 피드백 2026-10-03) | **Open (등록)** — 수정 대상 S77(수석 확정 분석) · 원인 가설 미검증 · Windows 확정 없음(사용자 진술) |
 | KI-028 | Med | F1 스페이스바가 키보드 포커스된 버튼을 동작시킴 | **Open (등록)** — 수정 대상 S76 · 사용자 진술, 로그/재현 정보 없음 · Windows 확정 없음 |
 | KI-027 | **High** | frame-drop 초당 약 10~20 지속 (S69~S72 로그에서 반복, decoder/vo drop 0) | **Open · 고위험** — 원인 미확정(수석: VO 단계 누적 드롭, 가설 H1~H3 = 가설) · Windows 우선 항목이나 03:45 지시로 정기 테스트 없음, 필요 시 USER WINDOWS TEST REQUIRED |
@@ -149,11 +147,45 @@ ORANGE 18% · ΔR −10pp/~12m · Missed +2m · hard freeze · RED≤5% SAFE STO
 - KI-022: Windows 증거 없음.
 - 종료 조건: 다음 Windows 점검에 REPRO 시나리오를 명시한 항목 포함.
 
-## 2026-10-22 KST 갱신 (S133, 총괄 LOCK)
-- **KI-030 RESOLVED** — Windows PASS 2026-10-22, 빌드 `BLD-20261021-PHASEA-S132-001` / commit `e099c2e`.
-- **KI-031** (Low, Known Limitation) — 고해상도 영상에서 시크 후 약 1초 끊김. 출처: L1 사용자 관찰. 정밀(hr) 시크 비용 의심, **원인 미검증(NOT VERIFIED)**. PR #1 merge를 막지 않음.
+## SoT update 2026-10-28 23:00 KST (비서, per 총괄 22:35/22:59)
+- KI-031 (high-res seek ~1 s stutter): severity MEDIUM; root cause CONFIRMED by 총괄 = exact-seek decode cost (L5 mechanism / L4 app). Fix candidate A3 pending. Windows app NOT TESTED. Evidence: see DECISION_LOG D-20261028-RCA.
+- KI-027: 4K AV1 VO stage (L4), WPF host unrelated (L5); severity HIGH CANDIDATE (user L1 unconfirmed). K1 diagnostics next.
+- KI CANDIDATE: CommitSeek PersistResume stores pre-seek position (L2, unverified).
+- KI CANDIDATE: MpvEventIds.VideoReconfig=13, correct value 17 (symptom unconfirmed).
+- Repo KNOWN_ISSUES L125 correction pending: pause→play does not reset the counter.
+- SoT PENDING (총괄 23:08): "hwdec-interop log field is the configured option value, not the interop actually in use (use hwdec-current + VO log)." Repo reflection deferred to next docs Atomic together with L125 correction.
 
-### Pending decision (unclassified bare catches, code untouched)
-분류 미정 bare `catch` — 코드 변경 없음, 총괄 판단 대기 (기준 `e099c2e`):
-- `src/DesktopMediaPlayer.Platform/SpikeLogger.cs` L44, L54, L82
-- `src/DesktopMediaPlayer.Shell/MainWindow.xaml.cs` L812, L823, L832, L843
+### SoT update 2026-10-28 23:5x KST (비서) — H-1b / H-1c
+- KI-031: H-1b reconfirms exact-seek decode cost (4K AV1 exact p90 819 ms vs keyframe 58 ms, L5 harness). Medium. App Windows NOT TESTED.
+- KI-027: High CANDIDATE kept. Cause recorded: Intel iGPU default scaler (lanczos) render cost exceeds budget (L5 harness H-1c; baseline 24.7 drop/s, fresh 23.4 ms; bilinear f 1.0/s, profile=fast 0, NVIDIA adapter 0). Fix candidate A5 (LOCK after A3). App Windows NOT TESTED.
+- Evidence: continuity/KI-031-027-H1B-H1C-EVIDENCE-20261028.md
+
+### SoT update 2026-10-29 00:3x KST (비서) — A5 / H-1d
+- KI-027 (High CANDIDATE): fix plan A5 PARTIAL ACCEPT (A5-b conditional cscale ACCEPT; A5-a adapter policy POC PASS in H-1d L5 harness; A5-c REJECT as default; A5-d deferred). H-1d WPF embed: baseline 22.6/s; A5-b 0.17/s; NVIDIA 0/s. Open: cross-adapter swap chain query error, 10-bit dither. App Windows NOT TESTED. Evidence continuity/KI-027-H1D-EVIDENCE-20261029.md
+
+## 2026-10-30 23:10 KST A3 KI 후보 (총괄 지시)
+- KI 후보: A3 keyboard seek 후 OSD target과 실제 keyframe 위치 차이 (최대 keyframe 간격). Windows NOT TESTED.
+- KI 후보: 키 연타 시 상대 seek 누적 어긋남 (L4). Windows NOT TESTED.
+- KI 후보: SeekRelative 단위 테스트 미작성 → 후속 Atomic.
+
+## 2026-10-30 23:4x KST KI 후보 — CLI 파일 인자 미처리 (통합 정적 분석, c523c53)
+- 증상: 탐색기 "연결 프로그램"이나 `Shell.exe 파일경로`로 실행하면 앱은 뜨지만 파일이 열리지 않음.
+- 원인 (통합 보고): 구현 누락. App.OnStartup이 e.Args를 읽지 않고, Shell 전체에서 e.Args/Environment.GetCommandLineArgs 사용처 0건. MainWindow.OnLoaded(L105~)도 파일을 열지 않음. 파일 열기 경로는 Open 버튼(L190), 드래그앤드롭(L238), 재생목록뿐.
+- 분류: 구현 누락, 아키텍처 문제 아님 (통합 판단).
+- 수정 방향 (통합 제안, 수석 판단 대기): e.Args 첫 번째 기존 파일 보관 → probe 성공 뒤 Drop과 같은 경로(L387 _facade.Open + playlist 추가). 따옴표·공백 경로, 미지원 확장자, 없는 파일은 무시 + 로그. 단일 인스턴스와 두 번째 실행 인자 전달은 범위 밖.
+- 상태: KI 후보, 심각도 미정, Atomic 배정은 총괄 판단 대기. 정적 분석만 수행. Windows NOT TESTED.
+- 2026-10-30 23:40 KST 총괄 판정: 분류 "구현 누락"(버그 아님) 확정. VideoReconfig 다음 Atomic "CLI 파일 인자 열기" 배정, 우선순위 높음(자동 테스트·앱 seek 측정이 막혀 있음). 수석 LOCK 범위 00:10 기한, 단일 인스턴스 제외, 완료 조건에 단위 테스트 포함. Windows NOT TESTED.
+
+## 2026-11-05 11:22 KST — 수석 판정, 총괄 승인
+### KI-031
+- 이전 분류 'Known Limitation / Low / NOT VERIFIED' → SUPERSEDED.
+- 새 판정: Medium. Root Cause CONFIRMED (per 수석: H-1 harness L5, 4K AV1 exact seek p90 ≈976ms, keyframe p90 ≈79ms).
+- 수정: SEEKPOL에서 진행 (PENDING). Soft 검증 후 Windows 확인 1회 필요.
+- 후속 KI 후보: SEEKPOL 이후에도 남는 absolute Exact seek (챕터 이동, 재개 등).
+- Windows NOT TESTED.
+### KI-027
+- High 유지.
+- 원인 구조 (per 수석): gpu-next render ≈23ms로 16.7ms 예산을 넘음. 그중 약 71%가 cscale lanczos (L5).
+- 완화 작업: A5-b, VRCFG, A5-a, DIAG-GPUPROBE — 모두 Soft Closed.
+- 가설 순위: (1) iGPU에서 cscale 예산 초과 (2) 하이브리드 구성에서 dGPU가 적용되지 않음 (검증 B) (3) 서로 다른 어댑터 간 dither.
+- 앱 Windows 육안 확인과 drop 재측정 전에는 Close하거나 등급을 낮추지 않음. Windows NOT TESTED.
