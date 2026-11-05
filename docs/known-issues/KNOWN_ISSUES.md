@@ -4,9 +4,12 @@
 
 | ID | Sev | Issue | Status |
 |----|-----|-------|--------|
+| KI-031 | Medium | 고해상도 영상에서 시크 후 약 1초 끊김 | **Open** — Root Cause CONFIRMED (H-1 harness L5: 4K AV1 exact seek p90 ≈976ms, keyframe p90 ≈79ms, 2026-11-05 11:22 수석 판정·총괄 승인) · 수정은 SEEKPOL에서 진행(PENDING) · Windows NOT TESTED |
+| KI-031 (이전 판정) | Low | 고해상도 영상에서 시크 후 약 1초 끊김 (Known Limitation) | **SUPERSEDED (2026-11-05 11:22, 위 Medium 행으로 대체)** — 원문: Open (Known Limitation) — L1 사용자 관찰 · 정밀(hr) 시크 비용 의심, 원인 미검증(NOT VERIFIED) · PR #1 merge 차단 아님 |
+| KI-030 | Low | 재생바 버퍼링 바 오표시 | **RESOLVED** — Windows PASS 2026-10-22 (`BLD-20261021-PHASEA-S132-001` / `e099c2e`) |
 | KI-029 | Low | F2 전체화면 하단 레터박스 (사용자 피드백 2026-10-03) | **Open (등록)** — 수정 대상 S77(수석 확정 분석) · 원인 가설 미검증 · Windows 확정 없음(사용자 진술) |
 | KI-028 | Med | F1 스페이스바가 키보드 포커스된 버튼을 동작시킴 | **Open (등록)** — 수정 대상 S76 · 사용자 진술, 로그/재현 정보 없음 · Windows 확정 없음 |
-| KI-027 | **High** | frame-drop 초당 약 10~20 지속 (S69~S72 로그에서 반복, decoder/vo drop 0) | **Open · 고위험** — 원인 미확정(수석: VO 단계 누적 드롭, 가설 H1~H3 = 가설) · Windows 우선 항목이나 03:45 지시로 정기 테스트 없음, 필요 시 USER WINDOWS TEST REQUIRED |
+| KI-027 | **High** | frame-drop 초당 약 10~20 지속 (S69~S72 로그에서 반복, decoder/vo drop 0) | **Open · 고위험** — 원인 구조 확인(2026-11-05 11:22 수석 판정: gpu-next render ≈23ms가 16.7ms 예산 초과, 그중 약 71%가 cscale lanczos, L5) · 완화 A5-b·VRCFG·A5-a·DIAG-GPUPROBE 모두 Soft Closed · 앱 Windows 육안 확인과 drop 재측정 전에는 Close·등급 하향 없음 · Windows NOT TESTED · [이전 기재: 원인 미확정(수석: VO 단계 누적 드롭, 가설 H1~H3 = 가설) → SUPERSEDED] |
 | KI-026 | Med | EOF 후 Play 버튼이 재시작하지 않음 (S72 사용자 진술 + 로그: eof_reached state=Paused 이후 Playing/Paused 전이만) | **Open (등록)** — 수정 대상 S75 · 원인은 keep-open=yes 정황(가설) · 로그에서 영상 진행 증거 없음 |
 | KI-025 | Info | EOF에서 `end_file` 로그 없음 (S68 기대 reason=eof와 불일치) | **문서 정정 항목 성격** — 수석 확정 분석: keep-open=yes에 의한 정상 동작, 로그 기대 오류. 단 keep-open 값은 로그로 확인되지 않음(S72 eof_reached state=Paused 정황 일치) · Windows 확정 없음 · 삭제 없이 보존 |
 | KI-024 | Med | Seek/Timeline drag stuck | **Open** — Soft SUCCESS Soft (`04b90b0`/`HOTFIX-002`) · Windows Seek-drag 실기 대기 · Soft≠PASS · **[정정 2026-10-03: 사용자 S71 진술(03:07) "정상" = 진술만, 로그 증거 일부(seek id=20 ×9, 일시정지 seek 포함)이나 Windows PASS 아님, 상태는 WINDOWS PENDING 유지]** |
@@ -147,21 +150,30 @@ ORANGE 18% · ΔR −10pp/~12m · Missed +2m · hard freeze · RED≤5% SAFE STO
 - KI-022: Windows 증거 없음.
 - 종료 조건: 다음 Windows 점검에 REPRO 시나리오를 명시한 항목 포함.
 
-## SoT update 2026-10-28 23:00 KST (비서, per 총괄 22:35/22:59)
-- KI-031 (high-res seek ~1 s stutter): severity MEDIUM; root cause CONFIRMED by 총괄 = exact-seek decode cost (L5 mechanism / L4 app). Fix candidate A3 pending. Windows app NOT TESTED. Evidence: see DECISION_LOG D-20261028-RCA.
-- KI-027: 4K AV1 VO stage (L4), WPF host unrelated (L5); severity HIGH CANDIDATE (user L1 unconfirmed). K1 diagnostics next.
-- KI CANDIDATE: CommitSeek PersistResume stores pre-seek position (L2, unverified).
-- KI CANDIDATE: MpvEventIds.VideoReconfig=13, correct value 17 (symptom unconfirmed).
-- Repo KNOWN_ISSUES L125 correction pending: pause→play does not reset the counter.
-- SoT PENDING (총괄 23:08): "hwdec-interop log field is the configured option value, not the interop actually in use (use hwdec-current + VO log)." Repo reflection deferred to next docs Atomic together with L125 correction.
+## 2026-10-22 KST 갱신 (S133, 총괄 LOCK)
+- **KI-030 RESOLVED** — Windows PASS 2026-10-22, 빌드 `BLD-20261021-PHASEA-S132-001` / commit `e099c2e`.
+- **KI-031** (Low, Known Limitation) — 고해상도 영상에서 시크 후 약 1초 끊김. 출처: L1 사용자 관찰. 정밀(hr) 시크 비용 의심, **원인 미검증(NOT VERIFIED)**. PR #1 merge를 막지 않음. **[SUPERSEDED 2026-11-05 11:22 — 아래 Medium 판정으로 대체, 원문 보존]**
 
-### SoT update 2026-10-28 23:5x KST (비서) — H-1b / H-1c
-- KI-031: H-1b reconfirms exact-seek decode cost (4K AV1 exact p90 819 ms vs keyframe 58 ms, L5 harness). Medium. App Windows NOT TESTED.
-- KI-027: High CANDIDATE kept. Cause recorded: Intel iGPU default scaler (lanczos) render cost exceeds budget (L5 harness H-1c; baseline 24.7 drop/s, fresh 23.4 ms; bilinear f 1.0/s, profile=fast 0, NVIDIA adapter 0). Fix candidate A5 (LOCK after A3). App Windows NOT TESTED.
-- Evidence: continuity/KI-031-027-H1B-H1C-EVIDENCE-20261028.md
+### 결정 대기 (분류 미정 bare catch, 코드 변경 없음)
+분류 미정 bare `catch` — 코드 변경 없음, 총괄 판단 대기 (기준 `e099c2e`):
+- `src/DesktopMediaPlayer.Platform/SpikeLogger.cs` L44, L54, L82
+- `src/DesktopMediaPlayer.Shell/MainWindow.xaml.cs` L812, L823, L832, L843
 
-### SoT update 2026-10-29 00:3x KST (비서) — A5 / H-1d
-- KI-027 (High CANDIDATE): fix plan A5 PARTIAL ACCEPT (A5-b conditional cscale ACCEPT; A5-a adapter policy POC PASS in H-1d L5 harness; A5-c REJECT as default; A5-d deferred). H-1d WPF embed: baseline 22.6/s; A5-b 0.17/s; NVIDIA 0/s. Open: cross-adapter swap chain query error, 10-bit dither. App Windows NOT TESTED. Evidence continuity/KI-027-H1D-EVIDENCE-20261029.md
+## SoT 갱신 2026-10-28 23:00 KST (비서, 총괄 22:35/22:59 지시)
+- KI-031 (고해상도 시크 약 1초 끊김): 심각도 MEDIUM. 총괄이 원인을 정밀(exact) 시크 디코드 비용으로 확정(L5 메커니즘 / L4 앱). 수정 후보 A3 대기. 앱 Windows NOT TESTED. 근거: DECISION_LOG D-20261028-RCA.
+- KI-027: 4K AV1 VO 단계(L4), WPF 호스트와 무관(L5). 심각도 HIGH 후보(사용자 L1 미확인). 다음은 K1 진단.
+- KI 후보: CommitSeek의 PersistResume가 시크 이전 위치를 저장함(L2, 미검증).
+- KI 후보: MpvEventIds.VideoReconfig=13, 올바른 값은 17(증상 미확인).
+- repo KNOWN_ISSUES L125 정정 대기: pause→play는 카운터를 초기화하지 않음.
+- SoT 대기(총괄 23:08): "hwdec-interop 로그 필드는 실제 사용 중인 interop이 아니라 설정 옵션 값임(hwdec-current와 VO 로그를 볼 것)." repo 반영은 L125 정정과 함께 다음 docs Atomic으로 미룸.
+
+### SoT 갱신 2026-10-28 23:5x KST (비서) — H-1b / H-1c
+- KI-031: H-1b에서 정밀 시크 디코드 비용 재확인(4K AV1 exact p90 819 ms, keyframe 58 ms, L5 harness). Medium. 앱 Windows NOT TESTED.
+- KI-027: HIGH 후보 유지. 원인 기록: Intel iGPU 기본 스케일러(lanczos) 렌더 비용이 예산 초과(L5 harness H-1c; 기준 24.7 drop/s, fresh 23.4 ms; bilinear 1.0/s, profile=fast 0, NVIDIA 어댑터 0). 수정 후보 A5(A3 다음 LOCK). 앱 Windows NOT TESTED.
+- 근거: continuity/KI-031-027-H1B-H1C-EVIDENCE-20261028.md
+
+### SoT 갱신 2026-10-29 00:3x KST (비서) — A5 / H-1d
+- KI-027 (HIGH 후보): 수정 계획 A5 부분 수용(A5-b 조건부 cscale 수용, A5-a 어댑터 정책 POC는 H-1d L5 harness에서 PASS, A5-c 기본값으로는 거부, A5-d 보류). H-1d WPF 임베드: 기준 22.6/s, A5-b 0.17/s, NVIDIA 0/s. 남은 문제: 서로 다른 어댑터 간 swap chain 조회 오류, 10-bit dither. 앱 Windows NOT TESTED. 근거: continuity/KI-027-H1D-EVIDENCE-20261029.md
 
 ## 2026-10-30 23:10 KST A3 KI 후보 (총괄 지시)
 - KI 후보: A3 keyboard seek 후 OSD target과 실제 keyframe 위치 차이 (최대 keyframe 간격). Windows NOT TESTED.
@@ -179,13 +191,13 @@ ORANGE 18% · ΔR −10pp/~12m · Missed +2m · hard freeze · RED≤5% SAFE STO
 ## 2026-11-05 11:22 KST — 수석 판정, 총괄 승인
 ### KI-031
 - 이전 분류 'Known Limitation / Low / NOT VERIFIED' → SUPERSEDED.
-- 새 판정: Medium. Root Cause CONFIRMED (per 수석: H-1 harness L5, 4K AV1 exact seek p90 ≈976ms, keyframe p90 ≈79ms).
+- 새 판정: Medium. 원인 확정(Root Cause CONFIRMED, 수석 근거: H-1 harness L5, 4K AV1 exact seek p90 ≈976ms, keyframe p90 ≈79ms).
 - 수정: SEEKPOL에서 진행 (PENDING). Soft 검증 후 Windows 확인 1회 필요.
 - 후속 KI 후보: SEEKPOL 이후에도 남는 absolute Exact seek (챕터 이동, 재개 등).
 - Windows NOT TESTED.
 ### KI-027
 - High 유지.
-- 원인 구조 (per 수석): gpu-next render ≈23ms로 16.7ms 예산을 넘음. 그중 약 71%가 cscale lanczos (L5).
+- 원인 구조 (수석 판정): gpu-next render ≈23ms로 16.7ms 예산을 넘음. 그중 약 71%가 cscale lanczos (L5).
 - 완화 작업: A5-b, VRCFG, A5-a, DIAG-GPUPROBE — 모두 Soft Closed.
 - 가설 순위: (1) iGPU에서 cscale 예산 초과 (2) 하이브리드 구성에서 dGPU가 적용되지 않음 (검증 B) (3) 서로 다른 어댑터 간 dither.
 - 앱 Windows 육안 확인과 drop 재측정 전에는 Close하거나 등급을 낮추지 않음. Windows NOT TESTED.
