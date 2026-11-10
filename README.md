@@ -2,7 +2,9 @@
 
 WPF + libmpv desktop media player for Windows **win-x64** on **.NET 10** (`net10.0-windows`).
 
-**Status: Phase A Soft canonical e099c2e (BLD-20261021-PHASEA-S132-001). Windows high-risk check 2026-10-22: KI-030 and shutdown PASS, KI-031 Low (cause NOT VERIFIED). See KNOWN_ISSUES.**
+**상태: Phase A Soft Canonical `4ee4b6c` (BLD-20261105-PHASEA-GPUPOLICY03-002). Windows NOT TESTED. KI-031은 Medium, 원인 CONFIRMED(정밀 시크 디코드 비용), Open. 2026-11-10 10:18 KST USAGE-HALT-20261105-1743 RESOLVED, 작업 재개. 자세한 내용은 KNOWN_ISSUES와 docs/continuity/CONTINUITY-STATUS-NOW.md 참조.**
+
+이전 상태 표기(SUPERSEDED): Phase A Soft canonical e099c2e (BLD-20261021-PHASEA-S132-001). 2026-10-22 Windows 고위험 확인에서 KI-030·종료 PASS, 당시 KI-031 Low(원인 미검증).
 
 ## Layers
 
