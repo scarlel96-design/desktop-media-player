@@ -86,6 +86,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     private readonly string? _cacheDir;
 
+    /// <summary>SEC-HEVC-01 (KI-032 mitigation): mpv 0.40.0 default hwdec-codecs minus hevc; HEVC decodes in software.</summary>
+    public const string HwdecCodecs = "h264,vc1,vp8,vp9,av1,prores";
+
     /// <summary>SEC-YTDL-01: defensive pre-init options (no youtube-dl hook, no user/auto scripts).</summary>
     public static readonly IReadOnlyList<KeyValuePair<string, string>> HardeningOptions = new[]
     {
@@ -666,6 +669,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
+        MpvNative.mpv_set_option_string(_mpv, "hwdec-codecs", HwdecCodecs);
         foreach (var opt in HardeningOptions)
         {
             MpvNative.mpv_set_option_string(_mpv, opt.Key, opt.Value);
