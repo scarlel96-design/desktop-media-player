@@ -15,6 +15,13 @@ public sealed class MpvSecurityOptionsTests
     }
 
     [Fact]
+    public void HwdecCodecs_ExactDefaultListWithoutHevc()
+    {
+        Assert.Equal("h264,vc1,vp8,vp9,av1,prores", MpvPlaybackEngine.HwdecCodecs);
+        Assert.DoesNotContain("hevc", MpvPlaybackEngine.HwdecCodecs.Split(','));
+    }
+
+    [Fact]
     public void SecurityOptionFailure_WarnsOnlyOnNegativeRc()
     {
         Assert.Equal("name=ytdl rc=-5 error=option not found", MpvPlaybackEngine.SecurityOptionFailure("ytdl", -5, "option not found"));

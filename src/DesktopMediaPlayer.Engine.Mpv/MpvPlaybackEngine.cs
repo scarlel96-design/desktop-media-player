@@ -87,6 +87,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private readonly string? _cacheDir;
     private readonly HashSet<string> _absentSecurityOptions = new();
 
+    /// <summary>SEC-HEVC-01 (KI-032 mitigation): mpv 0.40.0 default hwdec-codecs minus hevc; HEVC decodes in software.</summary>
+    public const string HwdecCodecs = "h264,vc1,vp8,vp9,av1,prores";
+
     /// <summary>SEC-YTDL-01: defensive pre-init options (no youtube-dl hook, no user/auto scripts).</summary>
     public static readonly IReadOnlyList<KeyValuePair<string, string>> HardeningOptions = new[]
     {
@@ -690,6 +693,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
         _absentSecurityOptions.Clear();
+        SetSecurityOption("hwdec-codecs", HwdecCodecs);
         foreach (var opt in HardeningOptions)
         {
             SetSecurityOption(opt.Key, opt.Value);
@@ -736,7 +740,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 4, "osd-dimensions", MpvFormat.None);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
-        _logger.Log("info", "sec_options", $"ytdl={ReadSecurityOption("ytdl")} load-scripts={ReadSecurityOption("load-scripts")}");
+        _logger.Log("info", "sec_options", $"ytdl={ReadSecurityOption("ytdl")} load-scripts={ReadSecurityOption("load-scripts")} hwdec-codecs={ReadSecurityOption("hwdec-codecs")}");
 #if DMP_DIAG
         LogDiagOptions(diag);
 #endif
