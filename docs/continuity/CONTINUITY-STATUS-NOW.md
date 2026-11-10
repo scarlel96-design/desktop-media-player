@@ -9,6 +9,7 @@
 - 재개 순서 (Premium Player Pivot v1.0 STEP): STEP 1 SoT 정합(비서) → FFmpeg CVE-2026-125239 영향 확인(수석) → CI-FOUNDATION-01 → KI-027 Windows 증거 → SEEKPOL·KI-031 → Windows Batch → 통합 PR.
 - Open KI: KI-027 High, KI-031 Medium(원인 CONFIRMED), 둘 다 Windows NOT TESTED.
 - Open KI 추가: KI-032 High · Open · Windows NOT TESTED (FFmpeg CVE-2026-125239, 완화 SEC-HEVC-01 진행, 근본 수정은 상류 대기).
+- 정정(2026-11-10 10:37 KST, 총괄 지시, 검수 Low ①): 바로 위 줄의 "완화 SEC-HEVC-01 진행"은 SUPERSEDED. 완화: SEC-YTDL-01(보조) 진행, SEC-HEVC-01(직접 완화) High-risk 후보 보류. KI-032는 Open 유지. Canonical `4ee4b6c` 유지.
 - BLOCKED: 서브 컴퓨터 미연결, Windows 단계 연결 전까지 BLOCKED.
 - 아래 원문의 지난 HALT·재개 순서 표기는 SUPERSEDED.
 
