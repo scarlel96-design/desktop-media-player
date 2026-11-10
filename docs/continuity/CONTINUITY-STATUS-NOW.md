@@ -8,6 +8,7 @@
 - 사용량: 2026-11-10 08:53 KST 잔여 98.7% GREEN (per 사용량 감시). 초기화 예정 전 조기 회복, 원인 미확인(UNVERIFIED). 다음 측정 11-11 09:00 KST 전후, 11-11 22:00 KST.
 - 재개 순서 (Premium Player Pivot v1.0 STEP): STEP 1 SoT 정합(비서) → FFmpeg CVE-2026-125239 영향 확인(수석) → CI-FOUNDATION-01 → KI-027 Windows 증거 → SEEKPOL·KI-031 → Windows Batch → 통합 PR.
 - Open KI: KI-027 High, KI-031 Medium(원인 CONFIRMED), 둘 다 Windows NOT TESTED.
+- Open KI 추가: KI-032 High · Open · Windows NOT TESTED (FFmpeg CVE-2026-125239, 완화 SEC-HEVC-01 진행, 근본 수정은 상류 대기).
 - BLOCKED: 서브 컴퓨터 미연결, Windows 단계 연결 전까지 BLOCKED.
 - 아래 원문의 지난 HALT·재개 순서 표기는 SUPERSEDED.
 
