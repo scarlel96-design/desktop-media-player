@@ -93,6 +93,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         new KeyValuePair<string, string>("load-scripts", "no"),
     };
 
+    /// <summary>SEC review: warn text for a failed security option set (null when rc &gt;= 0). Playback is not blocked.</summary>
+    public static string? SecurityOptionFailure(string name, int rc, string errorText) =>
+        rc >= 0 ? null : $"name={name} rc={rc} error={errorText}";
+
     /// <summary>DATADIR: mpv cache options rooted at the injected cache dir (none when null).</summary>
     public static IReadOnlyList<KeyValuePair<string, string>> CacheOptions(string? cacheDir) =>
         string.IsNullOrEmpty(cacheDir)
@@ -668,7 +672,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
         foreach (var opt in HardeningOptions)
         {
-            MpvNative.mpv_set_option_string(_mpv, opt.Key, opt.Value);
+            SetSecurityOption(opt.Key, opt.Value);
         }
         MpvNative.mpv_set_option_string(_mpv, "vo", "gpu-next,gpu");
         // S100 frame-drop: cheaper downscale filter for oversized video (timing/queue unchanged).
@@ -712,11 +716,22 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 4, "osd-dimensions", MpvFormat.None);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
+        _logger.Log("info", "sec_options", $"ytdl={MpvNative.GetPropertyAndFree(_mpv, "ytdl") ?? "(n/a)"} load-scripts={MpvNative.GetPropertyAndFree(_mpv, "load-scripts") ?? "(n/a)"}");
 #if DMP_DIAG
         LogDiagOptions(diag);
 #endif
         LogRenderPath("after_init");
         return true;
+    }
+
+    private void SetSecurityOption(string name, string value)
+    {
+        var rc = MpvNative.mpv_set_option_string(_mpv, name, value);
+        var warn = SecurityOptionFailure(name, rc, rc < 0 ? MpvNative.GetErrorString(rc) : "");
+        if (warn is not null)
+        {
+            _logger.Log("warn", "sec_option_failed", warn);
+        }
     }
 
     private void ApplyWid()

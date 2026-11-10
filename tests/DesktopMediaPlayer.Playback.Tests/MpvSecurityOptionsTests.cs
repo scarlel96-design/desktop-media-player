@@ -13,4 +13,11 @@ public sealed class MpvSecurityOptionsTests
             new[] { new KeyValuePair<string, string>("ytdl", "no"), new KeyValuePair<string, string>("load-scripts", "no") },
             MpvPlaybackEngine.HardeningOptions);
     }
+
+    [Fact]
+    public void SecurityOptionFailure_WarnsOnlyOnNegativeRc()
+    {
+        Assert.Equal("name=ytdl rc=-5 error=option not found", MpvPlaybackEngine.SecurityOptionFailure("ytdl", -5, "option not found"));
+        Assert.Null(MpvPlaybackEngine.SecurityOptionFailure("hwdec-codecs", 0, ""));
+    }
 }
