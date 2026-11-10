@@ -19,5 +19,7 @@ libass #961 merged; no CVE update / no release; urgency LOW. RC License/Security
 - 상태: ACTIVE
 - 마지막 실행: 2026-11-10 10:25 KST, 다음 실행: 2026-11-13 10:09 KST (per 총괄)
 - 기준선: mpv 0.42.0, FFmpeg 9.0.2/8.1.3, libplacebo 7.387.0 (per 총괄). 이전 기준선 mpv v0.41.0은 SUPERSEDED.
-- Addendum: TRA-20261106-001, TRA-20261110-001 (ID만 기록, 본문·SHA는 비서 미수령 UNRECEIVED)
+- Addendum: TRA-20261106-001, TRA-20261110-001 — 최초 기록 시 UNRECEIVED였으나 2026-11-10 10:2x KST 비서가 본문과 SHA-256을 직접 확인함(아래). 위 UNRECEIVED 표기는 SUPERSEDED.
+  - TRA-20261106-001 (SHA-256 `ffb4cd1b50e74f2e0eed6aa37bda81e7b89a958b9a4cf1b43bc70cb52828cd5d`, 총괄 제시값 `ffb4cd1b…cd5d`와 일치): mpv v0.42.0 안정판 출시(libmpv D3D11 render API, libplacebo ≥ v7.387.0 요구, 프로젝트 번들 v7.349.0과 차이). 공식 LGPL Windows libmpv 자산 있음. shinchiro 바이너리는 여전히 GPLv3 FFmpeg로 제품 번들 불가. 드라이버 기준 후보 NVIDIA 621.14, AMD 26.10.2, Intel 32.0.101.9175. 신규 HIGH 보안 없음(per 기술조사). 채택 시점·영향 평가는 수석, 결정은 총괄.
+  - TRA-20261110-001 (SHA-256 `963fba4e82e98529d421054cf7f05d1deb2be1357cc71392377a8fee7d24eb0d`, 총괄 제시값 `963fba4e…eb0d`와 일치): 우선(PRIORITY) 보안 에스컬레이션. FFmpeg CVE-2026-125239(HIGH 7.3, CNA 점수)는 HEVC DXVA2/D3D11VA 디코드 힙 버퍼 오버플로로 "through 9.0.2" 영향, 수정 릴리스 없음, 상류 PR #25136 미병합. 프로젝트 D3D11VA 경로에 직접 해당(per 기술조사). 번들 FFmpeg 버전·구성은 미확인(EVIDENCE INSUFFICIENT). 부수 항목: mpv CVE-2026-123095(ytdl_hook, 0.42.0에서 수정, 프로젝트 해당 여부 UNVERIFIED). 영향 확인은 수석 담당.
 - 보안 우선 항목: FFmpeg CVE-2026-125239 영향 확인은 수석 담당(재개 순서 2번).
