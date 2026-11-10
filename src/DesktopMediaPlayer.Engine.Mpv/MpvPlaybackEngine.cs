@@ -86,6 +86,13 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
     private readonly string? _cacheDir;
 
+    /// <summary>SEC-YTDL-01: defensive pre-init options (no youtube-dl hook, no user/auto scripts).</summary>
+    public static readonly IReadOnlyList<KeyValuePair<string, string>> HardeningOptions = new[]
+    {
+        new KeyValuePair<string, string>("ytdl", "no"),
+        new KeyValuePair<string, string>("load-scripts", "no"),
+    };
+
     /// <summary>DATADIR: mpv cache options rooted at the injected cache dir (none when null).</summary>
     public static IReadOnlyList<KeyValuePair<string, string>> CacheOptions(string? cacheDir) =>
         string.IsNullOrEmpty(cacheDir)
@@ -659,6 +666,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
+        foreach (var opt in HardeningOptions)
+        {
+            MpvNative.mpv_set_option_string(_mpv, opt.Key, opt.Value);
+        }
         MpvNative.mpv_set_option_string(_mpv, "vo", "gpu-next,gpu");
         // S100 frame-drop: cheaper downscale filter for oversized video (timing/queue unchanged).
         MpvNative.mpv_set_option_string(_mpv, "dscale", "bilinear");
