@@ -23,3 +23,10 @@ libass #961 merged; no CVE update / no release; urgency LOW. RC License/Security
   - TRA-20261106-001 (SHA-256 `ffb4cd1b50e74f2e0eed6aa37bda81e7b89a958b9a4cf1b43bc70cb52828cd5d`, 총괄 제시값 `ffb4cd1b…cd5d`와 일치): mpv v0.42.0 안정판 출시(libmpv D3D11 render API, libplacebo ≥ v7.387.0 요구, 프로젝트 번들 v7.349.0과 차이). 공식 LGPL Windows libmpv 자산 있음. shinchiro 바이너리는 여전히 GPLv3 FFmpeg로 제품 번들 불가. 드라이버 기준 후보 NVIDIA 621.14, AMD 26.10.2, Intel 32.0.101.9175. 신규 HIGH 보안 없음(per 기술조사). 채택 시점·영향 평가는 수석, 결정은 총괄.
   - TRA-20261110-001 (SHA-256 `963fba4e82e98529d421054cf7f05d1deb2be1357cc71392377a8fee7d24eb0d`, 총괄 제시값 `963fba4e…eb0d`와 일치): 우선(PRIORITY) 보안 에스컬레이션. FFmpeg CVE-2026-125239(HIGH 7.3, CNA 점수)는 HEVC DXVA2/D3D11VA 디코드 힙 버퍼 오버플로로 "through 9.0.2" 영향, 수정 릴리스 없음, 상류 PR #25136 미병합. 프로젝트 D3D11VA 경로에 직접 해당(per 기술조사). 번들 FFmpeg 버전·구성은 미확인(EVIDENCE INSUFFICIENT). 부수 항목: mpv CVE-2026-123095(ytdl_hook, 0.42.0에서 수정, 프로젝트 해당 여부 UNVERIFIED). 영향 확인은 수석 담당.
 - 보안 우선 항목: FFmpeg CVE-2026-125239 영향 확인은 수석 담당(재개 순서 2번).
+
+## 2026-11-10 정정: 프로젝트 번들 mpv 기준선 (총괄 Gate SEC-TRA-20261110-001)
+- 프로젝트가 실제로 번들한 libmpv는 mpv **v0.40.0** 계열이다(per 수석, `libmpv-2.dll` 문자열 `mpv v0.40.0`, meson 로그 `Project version: 0.40.0`). clone 커밋 `e48ac7ce08462f5e33af6ef9deeac6fa87eef01e`가 정확히 v0.40.0 태그인지는 미확인(UNVERIFIED, per 수석).
+- TRA-20261106-001의 "was v0.41.0" 서술과, 이 문서 2026-10-23·10-28 항목의 "mpv v0.41.0" 기준선은 프로젝트 번들 기준으로는 사실과 달라 SUPERSEDED. 원문은 이력으로 보존하며, TRA 원본 문서는 기술조사 봇 소관이라 수정하지 않았다.
+- 위 11-10 최소 갱신의 "mpv 0.42.0"은 상류 최신 안정판 기준선이며 프로젝트 번들 값이 아니다. 번들 FFmpeg는 n7.1.1(per 수석)이다.
+- 근거: `/workspace/rca/SEC-TRA-20261110-001-ARCH.md` SHA-256 `45180c528ee8ae8102689e673885e272eb0045df4db432ad268c15f4f8308c26`(비서 직접 확인, 총괄 제시값 `45180c52…8c26`과 일치).
+- TRA-20261106(mpv 0.42 D3D11 render API)은 INVESTIGATE 유지(총괄).

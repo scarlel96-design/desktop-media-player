@@ -4,6 +4,7 @@
 
 | ID | Sev | Issue | Status |
 |----|-----|-------|--------|
+| KI-032 | High | FFmpeg CVE-2026-125239: 조작된 HEVC 비트스트림이 DXVA2/D3D11VA HW 디코드 중 힙 버퍼 오버플로(`ff_dxva2_hevc_fill_picture_parameters()`) | **Open** — 2026-11-10 신규 등재(총괄 Gate SEC-TRA-20261110-001). 번들 FFmpeg n7.1.1 + `hwdec=d3d11va,d3d11va-copy` + `hwdec-codecs` 기본값(hevc 포함)으로 정적 분석상 해당(per 수석, `/workspace/rca/SEC-TRA-20261110-001-ARCH.md` SHA-256 `45180c528ee8ae8102689e673885e272eb0045df4db432ad268c15f4f8308c26`). 완화: Atomic SEC-HEVC-01(`hwdec-codecs`에서 hevc 제외, `ytdl=no`, `load-scripts=no`) 진행 중, 미완료. 근본 해결: 상류 FFmpeg 수정 대기(PR #25136 미병합, 수정 릴리스 없음). 상향은 HOLD, 백포트는 상류 지연 시 별도 승인. 4K HEVC SW 디코드 CPU 부하 미측정 · Windows NOT TESTED |
 | KI-031 | Medium | 고해상도 영상에서 시크 후 약 1초 끊김 | **Open · 원인 확정(CONFIRMED)** — 2026-11-05 수석 판정·총괄 승인. 정밀(exact) 시크 디코드 비용(H-1 하네스 L5: 4K AV1 exact p90 약 976ms, keyframe p90 약 79ms). 수정은 SEEKPOL에서 진행(PENDING), Soft 검증 후 Windows 확인 1회 필요. 챕터·재개 등 남는 absolute Exact 시크는 후속 KI 후보 · Windows NOT TESTED |
 | KI-031 (이전 판정) | Low | 고해상도 영상에서 시크 후 약 1초 끊김 (Known Limitation) | **SUPERSEDED (2026-11-05)** — 원문: Open (Known Limitation) — L1 사용자 관찰 · 정밀(hr) 시크 비용 의심, 원인 미검증(NOT VERIFIED) · PR #1 merge 차단 아님 |
 | KI-030 | Low | 재생바 버퍼링 바 오표시 | **RESOLVED** — Windows PASS 2026-10-22 (`BLD-20261021-PHASEA-S132-001` / `e099c2e`) |
