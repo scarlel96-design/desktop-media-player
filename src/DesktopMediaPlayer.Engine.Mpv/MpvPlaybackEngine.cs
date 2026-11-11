@@ -85,6 +85,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     }
 
     private readonly string? _cacheDir;
+    private readonly HashSet<string> _absentSecurityOptions = new();
 
     /// <summary>SEC-YTDL-01: defensive pre-init options (no youtube-dl hook, no user/auto scripts).</summary>
     public static readonly IReadOnlyList<KeyValuePair<string, string>> HardeningOptions = new[]
@@ -96,6 +97,24 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     /// <summary>SEC review: warn text for a failed security option set (null when rc &gt;= 0). Playback is not blocked.</summary>
     public static string? SecurityOptionFailure(string name, int rc, string errorText) =>
         rc >= 0 ? null : $"name={name} rc={rc} error={errorText}";
+
+    /// <summary>SEC-YTDL-01d: MPV_ERROR_OPTION_NOT_FOUND.</summary>
+    public const int MpvErrorOptionNotFound = -5;
+
+    /// <summary>SEC-YTDL-01d: options allowed to be missing from the bundled libmpv (no Lua: ytdl not registered).</summary>
+    public static readonly IReadOnlyCollection<string> AbsentTolerated = new[] { "ytdl" };
+
+    public enum SecurityOptionResult { Ok, Absent, Failed }
+
+    /// <summary>SEC-YTDL-01d: Absent only for a tolerated option reporting option-not-found; any other rc &lt; 0 is Failed.</summary>
+    public static SecurityOptionResult ClassifySecurityOption(string name, int rc) =>
+        rc >= 0 ? SecurityOptionResult.Ok
+        : rc == MpvErrorOptionNotFound && AbsentTolerated.Contains(name) ? SecurityOptionResult.Absent
+        : SecurityOptionResult.Failed;
+
+    /// <summary>SEC-YTDL-01d: sec_options value; "absent" only when the set was Absent and readback is null.</summary>
+    public static string SecurityOptionDisplay(string? actual, bool absentOnSet) =>
+        actual ?? (absentOnSet ? "absent" : "(n/a)");
 
     /// <summary>DATADIR: mpv cache options rooted at the injected cache dir (none when null).</summary>
     public static IReadOnlyList<KeyValuePair<string, string>> CacheOptions(string? cacheDir) =>
@@ -670,6 +689,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
+        _absentSecurityOptions.Clear();
         foreach (var opt in HardeningOptions)
         {
             SetSecurityOption(opt.Key, opt.Value);
@@ -716,7 +736,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 4, "osd-dimensions", MpvFormat.None);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
-        _logger.Log("info", "sec_options", $"ytdl={MpvNative.GetPropertyAndFree(_mpv, "ytdl") ?? "(n/a)"} load-scripts={MpvNative.GetPropertyAndFree(_mpv, "load-scripts") ?? "(n/a)"}");
+        _logger.Log("info", "sec_options", $"ytdl={ReadSecurityOption("ytdl")} load-scripts={ReadSecurityOption("load-scripts")}");
 #if DMP_DIAG
         LogDiagOptions(diag);
 #endif
@@ -727,12 +747,20 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private void SetSecurityOption(string name, string value)
     {
         var rc = MpvNative.mpv_set_option_string(_mpv, name, value);
-        var warn = SecurityOptionFailure(name, rc, rc < 0 ? MpvNative.GetErrorString(rc) : "");
-        if (warn is not null)
+        switch (ClassifySecurityOption(name, rc))
         {
-            _logger.Log("warn", "sec_option_failed", warn);
+            case SecurityOptionResult.Absent:
+                _absentSecurityOptions.Add(name);
+                _logger.Log("info", "sec_option_absent", $"name={name} rc={rc}");
+                break;
+            case SecurityOptionResult.Failed:
+                _logger.Log("warn", "sec_option_failed", SecurityOptionFailure(name, rc, MpvNative.GetErrorString(rc)) ?? string.Empty);
+                break;
         }
     }
+
+    private string ReadSecurityOption(string name) =>
+        SecurityOptionDisplay(MpvNative.GetPropertyAndFree(_mpv, name), _absentSecurityOptions.Contains(name));
 
     private void ApplyWid()
     {
