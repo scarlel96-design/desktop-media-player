@@ -14,7 +14,7 @@ internal static class MpvEventIds
     public const int EndFile = 7;
     public const int FileLoaded = 8;
     public const int Idle = 11;
-    public const int VideoReconfig = 13;
+    public const int VideoReconfig = 17;
     public const int PlaybackRestart = 21;
     public const int PropertyChange = 22;
 }

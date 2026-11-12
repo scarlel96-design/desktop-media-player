@@ -7,4 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(DmpDiag)'!='true'">
+    <Compile Remove="DiagSeekScript.cs" />
+  </ItemGroup>
 </Project>

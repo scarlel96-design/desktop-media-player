@@ -134,10 +134,48 @@ public partial class MainWindow : Window, IPlaybackObserver
             ShowError(
                 "libmpv-2.dll not found. Place LGPL binaries under native/win-x64 or set DMP_LIBMPV_PATH. "
                 + (detail ?? string.Empty));
+            LogStartupArg(app, StartupOpenOutcome.ProbeFailed, null);
         }
         else
         {
             StatusText.Text = "Ready — open a local media file.";
+            if (app.StartupMediaPath is { } startupPath)
+            {
+                var failure = TryOpenStartupFile(startupPath);
+                LogStartupArg(app, failure is null ? StartupOpenOutcome.Opened : StartupOpenOutcome.OpenFailed, failure);
+            }
+            else
+            {
+                LogStartupArg(app, StartupArgsLog.NoPathOutcome(app.StartupArgCount), null);
+            }
+        }
+    }
+
+    /// <summary>CLI startup arg: one line, extension only (no full path, privacy).</summary>
+    private static void LogStartupArg(App app, StartupOpenOutcome outcome, string? reason)
+    {
+        var ext = app.StartupMediaPath is { } p ? System.IO.Path.GetExtension(p) : string.Empty;
+        app.Logger?.Log("info", "startup_args", StartupArgsLog.Format(app.StartupArgCount, outcome, reason, ext));
+    }
+
+    /// <summary>KI-CLIARG-01: startup open with a real result. Returns null on success, else not_found/exception.
+    /// Async load errors (e.g. unsupported format) surface later via engine events, not here.</summary>
+    private string? TryOpenStartupFile(string path)
+    {
+        if (!System.IO.File.Exists(path))
+        {
+            return "not_found";
+        }
+
+        try
+        {
+            OpenMediaFiles(new[] { path });
+            return null;
+        }
+        catch (System.Exception ex)
+        {
+            (Application.Current as App)?.Logger?.Log("warn", "startup_args_open_error", ex.GetType().Name);
+            return "exception";
         }
     }
 
@@ -215,7 +253,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                 LastOpenDirectoryPrefsStore.Persist(dir);
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore path/IO failures.
             (Application.Current as App)?.Logger?.Log("warn", "last_open_dir_persist_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -314,7 +352,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _facade.LoadExternalSubtitle(path);
             PopulateTrackList(MediaTrackKind.Subtitle);
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft no-op.
             (Application.Current as App)?.Logger?.Log("warn", "subtitle_drop_load_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -651,7 +689,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore clipboard failures.
             (Application.Current as App)?.Logger?.Log("warn", "clipboard_copy_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -694,7 +732,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore clipboard failures.
             (Application.Current as App)?.Logger?.Log("warn", "clipboard_copy_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -737,7 +775,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore clipboard failures.
             (Application.Current as App)?.Logger?.Log("warn", "clipboard_copy_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -755,7 +793,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                 title = _facade.GetMediaInfo().Title;
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore GetMediaInfo failures.
             (Application.Current as App)?.Logger?.Log("warn", "media_info_read_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -796,7 +834,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore clipboard failures.
             (Application.Current as App)?.Logger?.Log("warn", "clipboard_copy_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -880,7 +918,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _facade.SetSubtitleOffset(0);
             ShowSubtitleOffsetOsd();
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft no-op.
             (Application.Current as App)?.Logger?.Log("warn", "subtitle_offset_reset_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -922,7 +960,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _osdFadeTimer.Stop();
             _osdFadeTimer.Start();
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // Soft ignore explorer launch failures.
             (Application.Current as App)?.Logger?.Log("warn", "explorer_launch_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -1238,7 +1276,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             target = Math.Max(0, target);
         }
 
-        _facade.Seek(target);
+        _facade.SeekRelative(target - position, SeekPrecision.Keyframe);
         ShowSeekOsd(target, duration);
     }
 
@@ -1954,7 +1992,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                     LastOpenDirectoryPrefsStore.Persist(dir);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 // Soft ignore path/IO failures.
                 (Application.Current as App)?.Logger?.Log("warn", "last_open_dir_persist_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -2111,7 +2149,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             var value = key?.GetValue("AppsUseLightTheme");
             return value is int i && i == 1;
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             (Application.Current as App)?.Logger?.Log("warn", "system_theme_read_failed", $"{ex.GetType().Name}: {ex.Message}");
             return false;
@@ -2378,6 +2416,9 @@ public partial class MainWindow : Window, IPlaybackObserver
             ArmAutoHide();
             ApplyPendingResumeAtFirstFrame();
             SoftUpdateWindowTitle();
+#if DMP_DIAG
+            (Application.Current as App)?.DiagSeek?.Start();
+#endif
         });
     }
 
@@ -2392,7 +2433,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                 Title = $"{name} - Desktop Media Player";
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             (Application.Current as App)?.Logger?.Log("warn", "window_title_update_failed", $"{ex.GetType().Name}: {ex.Message}");
         }
@@ -2515,7 +2556,7 @@ public partial class MainWindow : Window, IPlaybackObserver
                     LastOpenDirectoryPrefsStore.Persist(dir);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 // Soft ignore path/IO failures.
                 (Application.Current as App)?.Logger?.Log("warn", "last_open_dir_persist_failed", $"{ex.GetType().Name}: {ex.Message}");
@@ -2562,6 +2603,9 @@ public partial class MainWindow : Window, IPlaybackObserver
 
     protected override void OnClosed(EventArgs e)
     {
+#if DMP_DIAG
+        (Application.Current as App)?.DiagSeek?.Stop();
+#endif
         WindowBoundsStore.Persist(this);
         PersistVolumePrefs();
         PersistThemePrefs();
@@ -2579,7 +2623,7 @@ public partial class MainWindow : Window, IPlaybackObserver
             _facade?.RenderHost?.Detach();
             _facade?.RemoveObserver(this);
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             // ignore
             (Application.Current as App)?.Logger?.Log("warn", "window_teardown_failed", $"{ex.GetType().Name}: {ex.Message}");

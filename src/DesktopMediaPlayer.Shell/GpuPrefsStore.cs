@@ -1,0 +1,54 @@
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using DesktopMediaPlayer.Contracts;
+using DesktopMediaPlayer.Engine.Mpv;
+
+namespace DesktopMediaPlayer.Shell;
+
+/// <summary>A5-a: read-only GPU preference ("gpuPreference") under LocalAppData (Shell-only, no UI writes it).</summary>
+internal static class GpuPrefsStore
+{
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    private static bool s_missingKeyLogged; // KI-GPUPOLICY-02: log missing_key once per process
+
+    private sealed record PrefsDto([property: JsonPropertyName(GpuAdapterPolicy.PrefsKey)] string? Value);
+
+    private static string FilePath
+    {
+        get
+        {
+            var dir = DesktopMediaPlayer.Platform.AppDataPaths.Current.Settings;
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, "gpu-prefs.json");
+        }
+    }
+
+    /// <summary>Missing file/key -> Auto; unknown value -> null (engine logs reason=invalid_pref and behaves as Auto).</summary>
+    public static GpuPreference? Load()
+    {
+        try
+        {
+            var path = FilePath;
+            if (!File.Exists(path))
+            {
+                return GpuPreference.Auto;
+            }
+
+            var json = File.ReadAllText(path);
+            var dto = JsonSerializer.Deserialize<PrefsDto>(json, JsonOptions);
+            if (!s_missingKeyLogged && !GpuAdapterPolicy.HasPrefsKey(json))
+            {
+                s_missingKeyLogged = true;
+                (System.Windows.Application.Current as App)?.Logger?.Log("info", "gpu_prefs", "reason=missing_key");
+            }
+
+            return GpuAdapterPolicy.ParsePreference(dto?.Value);
+        }
+        catch (Exception ex)
+        {
+            (System.Windows.Application.Current as App)?.Logger?.Log("warn", "prefs_load_failed", $"GpuPrefsStore: {ex.GetType().Name}: {ex.Message}");
+            return GpuPreference.Auto;
+        }
+    }
+}

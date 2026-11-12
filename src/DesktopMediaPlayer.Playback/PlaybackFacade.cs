@@ -131,6 +131,12 @@ public sealed class PlaybackFacade : IPlaybackEngine, IPlaybackObserver, INative
         _inner.Seek(seconds);
     }
 
+    public void SeekRelative(double deltaSeconds, SeekPrecision precision)
+    {
+        ThrowIfDisposed();
+        _inner.SeekRelative(deltaSeconds, precision);
+    }
+
     public void SetVolume(int volume)
     {
         ThrowIfDisposed();

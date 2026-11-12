@@ -3,7 +3,7 @@ using System.Text;
 namespace DesktopMediaPlayer.Platform;
 
 /// <summary>
-/// Spike logger writing UTF-8 lines to %LocalAppData%/desktop-media-player/spike.log and Console.
+/// Spike logger writing UTF-8 lines to AppDataPaths.Logs/spike.log and Console.
 /// </summary>
 public sealed class SpikeLogger : IDisposable
 {
@@ -13,9 +13,7 @@ public sealed class SpikeLogger : IDisposable
 
     public SpikeLogger()
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "desktop-media-player");
+        var dir = AppDataPaths.Current.Logs;
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "spike.log");
         _writer = new StreamWriter(
@@ -24,12 +22,13 @@ public sealed class SpikeLogger : IDisposable
         {
             AutoFlush = true
         };
-        Log("info", "logger_started", $"path={path}");
+        Log("info", "logger_started", $"path={PathMask.Mask(path)}");
     }
 
     public void Log(string level, string eventKey, string message)
     {
-        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] {eventKey} {message}";
+        // DATADIR: mask data root / user profile in every message (ex.Message, native_loaded, ...).
+        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{level}] {eventKey} {PathMask.MaskText(message)}";
         lock (_gate)
         {
             if (_disposed)
@@ -57,7 +56,7 @@ public sealed class SpikeLogger : IDisposable
         }
     }
 
-    public void Open(string path) => Log("info", "open", path);
+    public void Open(string path) => Log("info", "open", PathMask.Mask(path));
     public void FirstFrame() => Log("info", "first_frame", "ok");
     public void HwdecActive(string detail) => Log("info", "hwdec_active", detail);
     public void HwdecFallback(string detail) => Log("warn", "hwdec_fallback", detail);

@@ -9,4 +9,7 @@
     <ProjectReference Include="..\DesktopMediaPlayer.Contracts\DesktopMediaPlayer.Contracts.csproj" />
     <ProjectReference Include="..\DesktopMediaPlayer.Platform\DesktopMediaPlayer.Platform.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(DmpDiag)'!='true'">
+    <Compile Remove="DiagMpvOptions.cs" />
+  </ItemGroup>
 </Project>

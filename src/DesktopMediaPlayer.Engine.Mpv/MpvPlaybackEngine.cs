@@ -27,27 +27,107 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     private PlaybackState _state = PlaybackState.Idle;
     private bool _firstFrameRaised;
     private long _seekRequestTs; // RV-01 Soft: Stopwatch ticks of pending seek request; 0 = none.
+    private int _seekCount; // K1: seek commands issued within the open _seekRequestTs measurement.
     private volatile bool _disposed;
     private int _disposeFlag; // S105: atomic Dispose entry guard
     private string? _pendingOpen;
     private int _volume = 100;
+    private string _cscale = CscalePolicy.Lanczos;
+    private readonly GpuPreference? _gpuPreference; // A5-a: null = invalid stored value (behaves as Auto)
+    private readonly IGpuAdapterProbe? _gpuProbe;
+    private bool _gpuAdapterApplied;
+    private bool _gpuRetried;
+    private bool _gpuDiagOverride = false; // only ever set under DMP_DIAG (explicit init: CS0649 in Release)
+    private long _loadGeneration; // A5-a: bumped by Open/Stop/Close/Dispose/retry; stale vo-configured timeouts are ignored
+    private long _voDeadlineGeneration;
+    private DateTime _voDeadlineUtc = DateTime.MaxValue;
     private DateTime _lastMetricsUtc = DateTime.MinValue;
     private static readonly TimeSpan MetricsInterval = TimeSpan.FromSeconds(2);
-    private const int SeekSlowMs = 1000;
+    private const int SeekSlowMs = 500;
 
     // KI-014 Soft: absolute drop counters + Δrate between samples (≠ perceived stutter).
     private long? _prevFrameDrop;
     private long? _prevDecoderDrop;
     private long? _prevVoDrop;
     private DateTime _prevDropSampleUtc = DateTime.MinValue;
+#if DMP_DIAG
+    // DIAG only: keys injected from diag-mpv.txt, and the 10 s summary window.
+    private readonly List<string> _diagAppliedKeys = new();
+    private static readonly TimeSpan DiagSummaryInterval = TimeSpan.FromSeconds(10);
+    private DateTime _diagSummaryUtc = DateTime.MinValue;
+    private long? _diagSummaryDrop;
+    private TimeSpan _diagSummaryCpu;
+    private string? _diagPolicyAdapter; // gpu-policy-adapter-override (policy only, not an mpv option)
+    private bool _diagFaultVo; // gpu-policy-fault=vo (app only)
+    private bool _diagFaultInjected;
+    private bool _diagFaultIgnoredLogged;
+    private string? _diagForceAdapter; // gpu-policy-force-adapter (app only)
+    private readonly IReadOnlyList<string>? _diagSearchDirs;
+#endif
 
-    public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null)
+    public MpvPlaybackEngine(SpikeLogger logger, IPlaybackObserver? observer = null,
+        GpuPreference? gpuPreference = GpuPreference.Auto, IGpuAdapterProbe? gpuProbe = null, string? cacheDir = null
+#if DMP_DIAG
+        , IReadOnlyList<string>? diagSearchDirs = null
+#endif
+        )
     {
+        _cacheDir = cacheDir;
+#if DMP_DIAG
+        _diagSearchDirs = diagSearchDirs;
+#endif
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _gpuPreference = gpuPreference;
+        _gpuProbe = gpuProbe;
         Observer = observer;
         _sync = SynchronizationContext.Current;
         RenderHost = new MpvRenderHost(this);
     }
+
+    private readonly string? _cacheDir;
+    private readonly HashSet<string> _absentSecurityOptions = new();
+
+    /// <summary>SEC-HEVC-01 (KI-032 mitigation): mpv 0.40.0 default hwdec-codecs minus hevc; HEVC decodes in software.</summary>
+    public const string HwdecCodecs = "h264,vc1,vp8,vp9,av1,prores";
+
+    /// <summary>SEC-YTDL-01: defensive pre-init options (no youtube-dl hook, no user/auto scripts).</summary>
+    public static readonly IReadOnlyList<KeyValuePair<string, string>> HardeningOptions = new[]
+    {
+        new KeyValuePair<string, string>("ytdl", "no"),
+        new KeyValuePair<string, string>("load-scripts", "no"),
+    };
+
+    /// <summary>SEC review: warn text for a failed security option set (null when rc &gt;= 0). Playback is not blocked.</summary>
+    public static string? SecurityOptionFailure(string name, int rc, string errorText) =>
+        rc >= 0 ? null : $"name={name} rc={rc} error={errorText}";
+
+    /// <summary>SEC-YTDL-01d: MPV_ERROR_OPTION_NOT_FOUND.</summary>
+    public const int MpvErrorOptionNotFound = -5;
+
+    /// <summary>SEC-YTDL-01d: options allowed to be missing from the bundled libmpv (no Lua: ytdl not registered).</summary>
+    public static readonly IReadOnlyCollection<string> AbsentTolerated = new[] { "ytdl" };
+
+    public enum SecurityOptionResult { Ok, Absent, Failed }
+
+    /// <summary>SEC-YTDL-01d: Absent only for a tolerated option reporting option-not-found; any other rc &lt; 0 is Failed.</summary>
+    public static SecurityOptionResult ClassifySecurityOption(string name, int rc) =>
+        rc >= 0 ? SecurityOptionResult.Ok
+        : rc == MpvErrorOptionNotFound && AbsentTolerated.Contains(name) ? SecurityOptionResult.Absent
+        : SecurityOptionResult.Failed;
+
+    /// <summary>SEC-YTDL-01d: sec_options value; "absent" only when the set was Absent and readback is null.</summary>
+    public static string SecurityOptionDisplay(string? actual, bool absentOnSet) =>
+        actual ?? (absentOnSet ? "absent" : "(n/a)");
+
+    /// <summary>DATADIR: mpv cache options rooted at the injected cache dir (none when null).</summary>
+    public static IReadOnlyList<KeyValuePair<string, string>> CacheOptions(string? cacheDir) =>
+        string.IsNullOrEmpty(cacheDir)
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[]
+            {
+                new KeyValuePair<string, string>("gpu-shader-cache-dir", Path.Combine(cacheDir, "shaders")),
+                new KeyValuePair<string, string>("icc-cache-dir", Path.Combine(cacheDir, "icc")),
+            };
 
     public IPlaybackObserver? Observer { get; set; }
 
@@ -70,6 +150,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     {
         _pendingOpen = path;
         _firstFrameRaised = false;
+        CancelVoTimer();
         _seekRequestTs = 0;
         ResetDropBaselines();
         SetState(PlaybackState.Opening);
@@ -93,6 +174,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     public void Close() => Post(() =>
     {
         _pendingOpen = null;
+        CancelVoTimer();
         if (_mpv != nint.Zero)
         {
             Check(MpvNative.mpv_command_string(_mpv, "stop"), "stop");
@@ -126,6 +208,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
     public void Stop() => Post(() =>
     {
         _seekRequestTs = 0;
+        CancelVoTimer();
         if (_mpv == nint.Zero)
         {
             return;
@@ -148,7 +231,28 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
         {
             _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+            _seekCount = 0;
         }
+
+        _seekCount += rc >= 0 && _seekRequestTs != 0 ? 1 : 0;
+    });
+
+    public void SeekRelative(double deltaSeconds, SeekPrecision precision) => Post(() =>
+    {
+        if (_mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var rc = MpvNative.mpv_command_string(_mpv, string.Create(CultureInfo.InvariantCulture, $"seek {deltaSeconds} {(precision == SeekPrecision.Keyframe ? "relative+keyframes" : "relative+exact")}"));
+        Check(rc, "seek");
+        if (rc >= 0 && (_state is PlaybackState.Playing or PlaybackState.Paused) && _seekRequestTs == 0)
+        {
+            _seekRequestTs = System.Diagnostics.Stopwatch.GetTimestamp();
+            _seekCount = 0;
+        }
+
+        _seekCount += rc >= 0 && _seekRequestTs != 0 ? 1 : 0;
     });
 
     public void SetVolume(int volume) => Post(() =>
@@ -468,6 +572,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         _disposed = true;
+        Interlocked.Increment(ref _loadGeneration);
         _cts.Cancel();
         _wake.Set();
         if (_thread is { IsAlive: true } && Thread.CurrentThread != _thread)
@@ -534,6 +639,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 }
 
                 PumpEvents();
+                CheckVoConfiguredTimeout();
                 MaybeLogPeriodicMetrics();
                 _wake.WaitOne(50);
             }
@@ -562,6 +668,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         try
         {
             _mpv = MpvNative.mpv_create();
+            _cscale = CscalePolicy.Lanczos;
         }
         catch (DllNotFoundException ex)
         {
@@ -585,6 +692,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
 
         ApplyWid();
         MpvNative.mpv_set_option_string(_mpv, "hwdec", "d3d11va,d3d11va-copy,no");
+        _absentSecurityOptions.Clear();
+        SetSecurityOption("hwdec-codecs", HwdecCodecs);
+        foreach (var opt in HardeningOptions)
+        {
+            SetSecurityOption(opt.Key, opt.Value);
+        }
         MpvNative.mpv_set_option_string(_mpv, "vo", "gpu-next,gpu");
         // S100 frame-drop: cheaper downscale filter for oversized video (timing/queue unchanged).
         MpvNative.mpv_set_option_string(_mpv, "dscale", "bilinear");
@@ -594,7 +707,24 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_set_option_string(_mpv, "input-default-bindings", "no");
         MpvNative.mpv_set_option_string(_mpv, "input-vo-keyboard", "no");
         MpvNative.mpv_set_option_string(_mpv, "terminal", "no");
+#if DMP_DIAG
+        MpvNative.mpv_request_log_messages(_mpv, "v"); // DIAG: verbose for d3d11 "Device Name:" (only matching lines are logged)
+#else
         MpvNative.mpv_request_log_messages(_mpv, "info");
+#endif
+        foreach (var opt in CacheOptions(_cacheDir))
+        {
+            // mpv creates these dirs on first write; the app does not pre-create them.
+            MpvNative.mpv_set_option_string(_mpv, opt.Key, opt.Value);
+        }
+#if DMP_DIAG
+        var diag = ApplyDiagOptions(); // after the hard-coded options so injected values win
+        _gpuDiagOverride = diag.Accepted.Any(p => p.Key == "d3d11-adapter");
+        _diagPolicyAdapter = diag.PolicyAdapterOverride;
+        _diagFaultVo = diag.PolicyFaultVo;
+        _diagForceAdapter = diag.PolicyForceAdapter;
+#endif
+        ApplyGpuPolicy();
 
         var init = MpvNative.mpv_initialize(_mpv);
         if (init < 0)
@@ -608,10 +738,33 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         MpvNative.mpv_observe_property(_mpv, 1, "pause", MpvFormat.Flag);
         MpvNative.mpv_observe_property(_mpv, 2, "hwdec-current", MpvFormat.String);
         MpvNative.mpv_observe_property(_mpv, 3, "eof-reached", MpvFormat.Flag);
+        MpvNative.mpv_observe_property(_mpv, 4, "osd-dimensions", MpvFormat.None);
         MpvNative.mpv_set_property_string(_mpv, "volume", _volume.ToString(CultureInfo.InvariantCulture));
+        _logger.Log("info", "sec_options", $"ytdl={ReadSecurityOption("ytdl")} load-scripts={ReadSecurityOption("load-scripts")} hwdec-codecs={ReadSecurityOption("hwdec-codecs")}");
+#if DMP_DIAG
+        LogDiagOptions(diag);
+#endif
         LogRenderPath("after_init");
         return true;
     }
+
+    private void SetSecurityOption(string name, string value)
+    {
+        var rc = MpvNative.mpv_set_option_string(_mpv, name, value);
+        switch (ClassifySecurityOption(name, rc))
+        {
+            case SecurityOptionResult.Absent:
+                _absentSecurityOptions.Add(name);
+                _logger.Log("info", "sec_option_absent", $"name={name} rc={rc}");
+                break;
+            case SecurityOptionResult.Failed:
+                _logger.Log("warn", "sec_option_failed", SecurityOptionFailure(name, rc, MpvNative.GetErrorString(rc)) ?? string.Empty);
+                break;
+        }
+    }
+
+    private string ReadSecurityOption(string name) =>
+        SecurityOptionDisplay(MpvNative.GetPropertyAndFree(_mpv, name), _absentSecurityOptions.Contains(name));
 
     private void ApplyWid()
     {
@@ -676,13 +829,37 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 SetState(PlaybackState.Idle);
                 break;
             case MpvEventIds.FileLoaded:
+#if DMP_DIAG
+                // gpu-policy-fault=vo: first file-loaded with the policy adapter applied -> one real VO fallback.
+                if (_diagFaultVo && !_diagFaultInjected && _gpuAdapterApplied && !_gpuRetried && !_firstFrameRaised)
+                {
+                    _diagFaultInjected = true;
+                    _logger.Log("warn", "gpu_fault", "fault=injected stage=vo");
+                    if (TryGpuFallback(GpuFailureStage.Vo))
+                    {
+                        break;
+                    }
+                }
+                else if (_diagFaultVo && !_diagFaultInjected && !_diagFaultIgnoredLogged
+                    && DiagMpvOptions.FaultIgnoredReason(_gpuAdapterApplied, _gpuRetried, _firstFrameRaised) is string faultReason)
+                {
+                    _diagFaultIgnoredLogged = true;
+                    _logger.Log("warn", "gpu_fault", $"fault=ignored reason={faultReason}");
+                }
+#endif
                 SetState(PlaybackState.Playing);
+                ArmVoConfiguredTimeout();
                 break;
             case MpvEventIds.EndFile:
                 // S103: map END_FILE by reason; error -> Error, eof/unknown -> Ended, stop/quit/redirect keep state.
                 var end = LogEndFile(evt.data);
                 if (end is { reason: 4 } failed)
                 {
+                    if (TryGpuFallback(GpuFallbackPolicy.StageForEndFileError(failed.error)))
+                    {
+                        break;
+                    }
+
                     RaiseError("playback.end_error", MpvNative.GetErrorString(failed.error), recoverable: true);
                     SetState(PlaybackState.Error);
                 }
@@ -692,13 +869,22 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
                 }
                 break;
             case MpvEventIds.VideoReconfig:
-                MaybeFirstFrame();
+                LogUnhandledEvent(evt.event_id);
+                ApplyCscalePolicy(logDecision: true);
                 break;
             case MpvEventIds.PlaybackRestart:
                 LogSeekLatency();
                 MaybeFirstFrame();
                 break;
             case MpvEventIds.LogMessage:
+#if DMP_DIAG
+                // mpv_event_log_message { prefix, level, text, log_level }: log only d3d11 "Device Name:" lines.
+                if (evt.data != nint.Zero
+                    && DiagMpvOptions.TryParseDeviceName(Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(evt.data, 2 * nint.Size)), out var deviceName))
+                {
+                    _logger.Log("info", "gpu_device", $"name={PathMask.MaskText(deviceName)}");
+                }
+#endif
                 break;
             case MpvEventIds.PropertyChange:
                 HandlePropertyChange(evt.data);
@@ -721,6 +907,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         if (string.Equals(name, "hwdec-current", StringComparison.Ordinal))
         {
             ReportHwdec();
+            ApplyCscalePolicy(); // hw-pixelformat may be filled late, after VideoReconfig
+        }
+        else if (string.Equals(name, "osd-dimensions", StringComparison.Ordinal))
+        {
+            ApplyCscalePolicy();
         }
         else if (string.Equals(name, "pause", StringComparison.Ordinal) && _state is PlaybackState.Playing or PlaybackState.Paused)
         {
@@ -741,6 +932,142 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
     }
 
+    // A5-b: the only place cscale is set. Re-evaluated on VideoReconfig, window resize (osd-dimensions) and hwdec-current change.
+    private void ApplyCscalePolicy(bool logDecision = false)
+    {
+        int P(string n) => int.TryParse(MpvNative.GetPropertyAndFree(_mpv, n), out var v) ? v : 0;
+        var dispW = P("osd-dimensions/w") - P("osd-dimensions/ml") - P("osd-dimensions/mr");
+        var dispH = P("osd-dimensions/h") - P("osd-dimensions/mt") - P("osd-dimensions/mb");
+        int srcW = P("video-params/w"), srcH = P("video-params/h");
+        var swFmt = MpvNative.GetPropertyAndFree(_mpv, "video-params/pixelformat");
+        var hwFmt = MpvNative.GetPropertyAndFree(_mpv, "video-params/hw-pixelformat");
+        var shift = CscalePolicy.ChromaShift(CscalePolicy.EffectivePixelFormat(hwFmt, swFmt));
+        var next = CscalePolicy.Decide(dispW, dispH, srcW, srcH, shift);
+        var chroma = $"{CscalePolicy.ChromaSize(srcW, shift)}x{CscalePolicy.ChromaSize(srcH, shift)}";
+#if DMP_DIAG
+        if (DiagMpvOptions.OverridesCscale(_diagAppliedKeys))
+        {
+            if (logDecision)
+            {
+                _logger.Log("info", "cscale_decision", $"decision=diag_override policy={next} cscale={MpvNative.GetPropertyAndFree(_mpv, "cscale") ?? "(n/a)"} override=1");
+            }
+
+            return;
+        }
+#endif
+        if (logDecision)
+        {
+            string G(string n) => MpvNative.GetPropertyAndFree(_mpv, n) ?? "(n/a)";
+            _logger.Log("info", "cscale_decision", $"decision={next} cur={_cscale} disp={dispW}x{dispH} chroma={chroma} pixelformat={swFmt ?? "(n/a)"} "
+                + $"hw-pixelformat={hwFmt ?? "(n/a)"} scale={G("scale")} cscale={G("cscale")} dscale={G("dscale")} hwdec-current={G("hwdec-current")}");
+        }
+
+        if (next == _cscale || MpvNative.mpv_set_property_string(_mpv, "cscale", next) < 0)
+        {
+            return;
+        }
+
+        _logger.Log("info", "cscale_policy", $"from={_cscale} to={next} disp={dispW}x{dispH} chroma={chroma}");
+        _cscale = next;
+    }
+
+    // A5-a: the only place d3d11-adapter is set by policy (pre-init). A DIAG d3d11-adapter disables the policy.
+    private void ApplyGpuPolicy()
+    {
+        var pref = _gpuPreference?.ToString() ?? "invalid";
+#if DMP_DIAG
+        if (_gpuDiagOverride)
+        {
+            _logger.Log("info", "gpu_policy", $"pref={pref} adapter=none reason=diag_override");
+            return;
+        }
+#endif
+
+        var probe = _gpuPreference == GpuPreference.HighPerformance ? _gpuProbe?.Probe() ?? GpuAdapterList.ProbeFailed : GpuAdapterList.ProbeFailed;
+        var decision = GpuAdapterPolicy.Decide(_gpuPreference, probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed);
+#if DMP_DIAG
+        // Override only replaces an adapter the policy chose; fallback/retry path unchanged.
+        (decision, var overrideIgnored) = DiagMpvOptions.ApplyAdapterOverride(decision, _diagPolicyAdapter);
+        if (overrideIgnored)
+        {
+            _logger.Log("info", "gpu_policy", $"pref={pref} reason={decision.Reason} ignored=no_policy_adapter");
+        }
+
+        if (_gpuPreference == GpuPreference.HighPerformance)
+        {
+            _logger.Log("info", "gpu_probe", DiagMpvOptions.FormatProbe(probe.HighPerformanceOrder, probe.DefaultAdapter, probe.Failed,
+                probe.DiagHighPerformanceVendorIds, probe.DiagDefaultVendorId));
+        }
+
+        decision = DiagMpvOptions.ApplyForceAdapter(decision, _diagForceAdapter);
+#endif
+        if (decision.Adapter is not null)
+        {
+            _gpuAdapterApplied = MpvNative.mpv_set_option_string(_mpv, "d3d11-adapter", decision.Adapter) >= 0;
+        }
+
+        _logger.Log("info", "gpu_policy", $"pref={pref} adapter={decision.Adapter ?? "none"} reason={decision.Reason}");
+    }
+
+    private void CancelVoTimer()
+    {
+        Interlocked.Increment(ref _loadGeneration);
+        _voDeadlineUtc = DateTime.MaxValue;
+    }
+
+    private void ArmVoConfiguredTimeout()
+    {
+        if (!_gpuAdapterApplied || _mpv == nint.Zero)
+        {
+            return;
+        }
+
+        var vid = MpvNative.GetPropertyAndFree(_mpv, "vid");
+        if (string.IsNullOrEmpty(vid) || string.Equals(vid, "no", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _voDeadlineGeneration = Interlocked.Read(ref _loadGeneration);
+        _voDeadlineUtc = DateTime.UtcNow + GpuFallbackPolicy.VoConfiguredTimeout;
+    }
+
+    private void CheckVoConfiguredTimeout()
+    {
+        if (_voDeadlineUtc == DateTime.MaxValue || DateTime.UtcNow < _voDeadlineUtc)
+        {
+            return;
+        }
+
+        _voDeadlineUtc = DateTime.MaxValue;
+        if (_mpv == nint.Zero || !GpuFallbackPolicy.IsTimeoutCurrent(_voDeadlineGeneration, Interlocked.Read(ref _loadGeneration))
+            || string.Equals(MpvNative.GetPropertyAndFree(_mpv, "vo-configured"), "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // Diagnostic only: a timeout never retries (only end_file error -15 does). Deadline is cleared above, so this logs once.
+        _logger.Log("warn", "gpu_policy", "vo_timeout=1 retry=0");
+    }
+
+    private bool TryGpuFallback(GpuFailureStage stage)
+    {
+        if (!_gpuAdapterApplied || _pendingOpen is null || _mpv == nint.Zero
+            || !GpuFallbackPolicy.ShouldRetry(_gpuPreference, stage, _gpuRetried, _firstFrameRaised, _gpuDiagOverride))
+        {
+            return false;
+        }
+
+        _gpuRetried = true;
+        _gpuAdapterApplied = false;
+        _logger.Log("warn", "gpu_policy", "fallback=1 reason=vo_init_failed");
+        MpvNative.mpv_set_property_string(_mpv, "d3d11-adapter", "");
+        CancelVoTimer();
+        SetState(PlaybackState.Opening);
+        LoadFile(_pendingOpen);
+        return true;
+    }
+
     private void MaybeFirstFrame()
     {
         if (_firstFrameRaised)
@@ -749,6 +1076,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         _firstFrameRaised = true;
+#if DMP_DIAG
+        // Summary window baseline restarts at first frame, the same signal that starts the seek-script runner.
+        _diagSummaryUtc = DateTime.MinValue;
+#endif
         _logger.FirstFrame();
         Raise(o => o.OnFirstFrame());
         LogRenderPath("first_frame");
@@ -799,7 +1130,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _seekRequestTs) * 1000L / System.Diagnostics.Stopwatch.Frequency;
         _seekRequestTs = 0;
         var slow = ms >= SeekSlowMs;
-        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow}");
+        var hwdec = MpvNative.GetPropertyAndFree(_mpv, "hwdec-current") ?? "(unknown)";
+        _logger.Log(slow ? "warn" : "info", "seek_latency", $"ms={ms} slow={slow} seeks={_seekCount} hwdec-current={hwdec}");
     }
 
     /// <summary>Logs vo / gpu-context / hwdec-current / frame drops for Windows spike evidence.</summary>
@@ -825,7 +1157,88 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         }
 
         LogPlaybackMetrics("periodic");
+#if DMP_DIAG
+        MaybeLogDiagSummary(now);
+#endif
     }
+#if DMP_DIAG
+
+    private DiagMpvOptions.Result ApplyDiagOptions()
+    {
+        _diagAppliedKeys.Clear();
+        var (path, source) = DiagMpvOptions.ResolveFile(_diagSearchDirs, File.Exists);
+        _logger.Log("info", "diag_opts", $"source={source} path={PathMask.Mask(path)}");
+        string[] lines;
+        try
+        {
+            lines = path is not null ? File.ReadAllLines(path) : Array.Empty<string>();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.Log("warn", "diag_opts", $"read_error={ex.GetType().Name}");
+            lines = Array.Empty<string>();
+        }
+
+        var result = DiagMpvOptions.Parse(lines);
+        foreach (var (key, value) in result.Accepted)
+        {
+            if (MpvNative.mpv_set_option_string(_mpv, key, value) >= 0)
+            {
+                _diagAppliedKeys.Add(key);
+            }
+        }
+
+        return result;
+    }
+
+    private void LogDiagOptions(DiagMpvOptions.Result result)
+    {
+        var parts = new List<string>();
+        foreach (var (key, value) in result.Accepted)
+        {
+            var applied = _diagAppliedKeys.Contains(key);
+            parts.Add($"{key}=accepted value={value} set={(applied ? "ok" : "failed")} readback={MpvNative.GetPropertyAndFree(_mpv, key) ?? "(n/a)"}");
+        }
+
+        foreach (var (key, reason) in result.Rejected)
+        {
+            parts.Add($"{key}=rejected reason={reason}");
+        }
+
+        _logger.Log("info", "diag_opts", parts.Count == 0 ? "none" : string.Join(" | ", parts));
+    }
+
+    private void MaybeLogDiagSummary(DateTime now)
+    {
+        var wall = now - _diagSummaryUtc;
+        if (_diagSummaryUtc != DateTime.MinValue && wall < DiagSummaryInterval)
+        {
+            return;
+        }
+
+        TimeSpan cpu;
+        using (var proc = System.Diagnostics.Process.GetCurrentProcess())
+        {
+            cpu = proc.TotalProcessorTime;
+        }
+
+        long? drop = long.TryParse(MpvNative.GetPropertyAndFree(_mpv, "frame-drop-count"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var d) ? d : null;
+        if (_diagSummaryUtc == DateTime.MinValue)
+        {
+            (_diagSummaryUtc, _diagSummaryDrop, _diagSummaryCpu) = (now, drop, cpu);
+            return;
+        }
+
+        double? dropRate = drop is long cur && _diagSummaryDrop is long prev && cur >= prev ? (cur - prev) / wall.TotalSeconds : null;
+        var voPasses = MpvNative.GetPropertyAndFree(_mpv, "vo-passes");
+        var freshMs = DiagMpvOptions.SumFreshAvgMs(voPasses);
+        var cpuPct = DiagMpvOptions.CpuPercent(cpu - _diagSummaryCpu, wall, Environment.ProcessorCount);
+        // vo-drop-rate counts frame-drop-count (VO drops only; decoder drops are not included).
+        // vo-passes-fmt=json|other|none is an L2 marker: if fresh-avg-ms stays (n/a) with fmt=other, switch to the node API.
+        _logger.Log("info", "diag_summary", $"window={DiagMpvOptions.Fmt(wall.TotalSeconds)}s vo-drop-rate={DiagMpvOptions.Fmt(dropRate)}/s fresh-avg-ms={DiagMpvOptions.Fmt(freshMs)} vo-passes-fmt={DiagMpvOptions.VoPassesFormat(voPasses)} process-cpu={DiagMpvOptions.Fmt(cpuPct)}%");
+        (_diagSummaryUtc, _diagSummaryDrop, _diagSummaryCpu) = (now, drop, cpu);
+    }
+#endif
 
     private void LogPlaybackMetrics(string phase)
     {
@@ -853,7 +1266,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         var deltaPart = FormatDropDeltas(now, frameDropRaw, decoderDropRaw, voDropRaw);
 
         // S72 diagnostics: extra render_path items, omitted when mpv cannot read them (vo-delayed-frame-count is already vo-drop).
-        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count" })
+        foreach (var key in new[] { "container-fps", "estimated-vf-fps", "display-fps", "video-params/w", "video-params/h", "video-params/pixelformat", "video-sync", "avsync", "mistimed-frame-count",
+                                  "video-codec", "estimated-display-fps", "vsync-jitter", "display-sync-active", "dwidth", "dheight", "osd-dimensions/w", "osd-dimensions/h", "hwdec-interop",
+                                  "video-params/hw-pixelformat", "scale", "cscale", "dscale" })
         {
             var val = MpvNative.GetPropertyAndFree(_mpv, key);
             if (val != null)
@@ -897,9 +1312,11 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
             }
 
             var d = cur - prev.Value;
+            var reset = d < 0; // K1: mpv resets drop counters on seek; report current value instead.
+            d = reset ? cur : d;
             var rate = d / dt;
             return $" {name}-delta={d.ToString(CultureInfo.InvariantCulture)}"
-                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s";
+                   + $" {name}-rate={rate.ToString("0.###", CultureInfo.InvariantCulture)}/s{(reset ? $" {name}-reset=1" : "")}";
         }
 
         var part = FormatOne("frame-drop", frameRaw, _prevFrameDrop)

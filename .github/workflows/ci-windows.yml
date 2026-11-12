@@ -1,0 +1,84 @@
+# CI-FOUNDATION-01 / CIF-01a: minimal Windows CI (build + unit tests, Release and DIAG).
+# Pivot Master Directive v1.0 section 23: native DLLs are NOT downloaded; no publish, no packaging.
+name: ci-windows
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test (${{ matrix.flavor }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: release
+            extra: ""
+          - flavor: diag
+            extra: "-p:DmpDiag=true"
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup .NET (global.json)
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+
+      - name: Show SDK
+        shell: pwsh
+        run: dotnet --info
+
+      - name: Prepare evidence folder
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore DesktopMediaPlayer.sln ${{ matrix.extra }}
+
+      - name: Build (Release x64)
+        shell: pwsh
+        run: dotnet build DesktopMediaPlayer.sln -c Release --no-restore ${{ matrix.extra }} "-bl:artifacts/build-${{ matrix.flavor }}.binlog" 2>&1 | Tee-Object -FilePath "artifacts/build-${{ matrix.flavor }}.log"; exit $LASTEXITCODE
+
+      - name: Test (Release x64)
+        shell: pwsh
+        run: |
+          $data = Join-Path $env:RUNNER_TEMP "dmp-appdata-${{ matrix.flavor }}"
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          $env:APPDATA = $data
+          $env:LOCALAPPDATA = $data
+          dotnet test DesktopMediaPlayer.sln -c Release --no-build ${{ matrix.extra }} --logger "trx;LogFileName=test-${{ matrix.flavor }}.trx" --results-directory artifacts/test-results
+          exit $LASTEXITCODE
+
+      - name: Warning count (baseline record)
+        if: always()
+        shell: pwsh
+        run: |
+          $log = "artifacts/build-${{ matrix.flavor }}.log"
+          if (Test-Path $log) {
+            $w = (Select-String -Path $log -Pattern 'warning [A-Z]+[0-9]+' | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique).Count
+            "warnings=$w" | Tee-Object -FilePath "artifacts/warnings-${{ matrix.flavor }}.txt"
+          }
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-${{ matrix.flavor }}-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30

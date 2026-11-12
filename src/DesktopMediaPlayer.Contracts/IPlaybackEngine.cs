@@ -9,6 +9,7 @@ public interface IPlaybackEngine : IDisposable
     void Pause();
     void Stop();
     void Seek(double seconds);
+    void SeekRelative(double deltaSeconds, SeekPrecision precision);
     void SetVolume(int volume); // 0-100
     PlaybackState GetState();
 
@@ -27,3 +28,5 @@ public interface IPlaybackEngine : IDisposable
     /// <summary>Buffered end time (seconds). Soft: position + demuxer cache; 0 if unknown.</summary>
     double GetBufferedEndSeconds();
 }
+
+public enum SeekPrecision { Exact, Keyframe }
