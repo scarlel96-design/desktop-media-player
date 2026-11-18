@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scarlel96-design/desktop-media-player/build/manifest/native-lock.schema.json",
+  "title": "DMP Native Lock (M-N) v1.0",
+  "description": "CIF-01b design v1.0 LOCK section 3.2. Provenance record only; contains no DLL. sourceUrl values are upstream repository URLs and are never download targets. Unmapped files use component \"UNMAPPED\" and are listed in knownGaps.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "bundleBuildId", "bundleZip", "builtAtUtc", "buildToolchain", "obtainedBy",
+    "license", "components", "files", "evidenceRefs", "knownGaps"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "bundleBuildId": { "type": "string", "minLength": 1 },
+    "bundleZip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256", "bytes"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "minLength": 1 },
+        "bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "builtAtUtc": { "type": "string", "minLength": 1 },
+    "buildToolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compiler", "crossFile"],
+      "properties": {
+        "compiler": { "type": "string", "minLength": 1 },
+        "crossFile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "obtainedBy": { "enum": ["built-from-source", "approved-cache"] },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["goal", "ffmpegConfigGpl", "ffmpegConfigNonfree", "ffmpegConfigVersion3", "mpvHaveGpl"],
+      "properties": {
+        "goal": { "type": "string", "minLength": 1 },
+        "ffmpegConfigGpl": { "$ref": "#/$defs/configFlag" },
+        "ffmpegConfigNonfree": { "$ref": "#/$defs/configFlag" },
+        "ffmpegConfigVersion3": { "$ref": "#/$defs/configFlag" },
+        "mpvHaveGpl": { "$ref": "#/$defs/configFlag" }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "describe", "commit", "sourceUrl", "license", "purl"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "describe": { "type": "string", "minLength": 1 },
+          "commit": { "type": "string", "minLength": 1 },
+          "sourceUrl": { "type": "string", "minLength": 1 },
+          "license": { "type": "string", "minLength": 1 },
+          "purl": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "sha256", "component"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "minLength": 1 },
+          "component": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "sha256"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "knownGaps": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "configFlag": {
+      "description": "Literal 0/1 value transcribed from config.h (CONFIG_GPL, CONFIG_NONFREE, CONFIG_VERSION3, HAVE_GPL).",
+      "type": "integer",
+      "enum": [0, 1]
+    }
+  }
+}

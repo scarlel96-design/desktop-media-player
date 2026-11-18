@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scarlel96-design/desktop-media-player/build/manifest/build-manifest.schema.json",
+  "title": "DMP Build Manifest (M-B) v1.0",
+  "description": "CIF-01b design v1.0 LOCK section 3.1. Measured values only; no verdicts (PASS/FAIL/Gate). artifacts.uploadDigest is intentionally not part of the manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "manifestKind", "buildId", "flavor", "configuration", "msbuildProperties",
+    "platform", "targetFramework", "source", "run", "toolchain", "tests", "warnings",
+    "buildResult", "testResult", "artifacts", "native", "generator", "evidenceClass"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "manifestKind": { "enum": ["ci", "local"] },
+    "buildId": { "type": "string", "minLength": 1 },
+    "flavor": { "enum": ["release", "diag"] },
+    "configuration": { "type": "string", "minLength": 1 },
+    "msbuildProperties": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "platform": { "type": "string", "minLength": 1 },
+    "targetFramework": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "event", "ref", "headSha", "checkoutSha", "treeClean"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "event": { "type": "string", "minLength": 1 },
+        "ref": { "type": "string", "minLength": 1 },
+        "headSha": { "$ref": "#/$defs/sha1Hex" },
+        "checkoutSha": { "$ref": "#/$defs/sha1Hex" },
+        "baseSha": { "$ref": "#/$defs/sha1Hex" },
+        "treeClean": { "type": "boolean" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "runAttempt", "workflowFile", "workflowSha256", "startedAtUtc", "finishedAtUtc"],
+      "properties": {
+        "runId": { "type": ["integer", "null"], "minimum": 0 },
+        "runAttempt": { "type": ["integer", "null"], "minimum": 1 },
+        "jobUrl": { "type": "string", "minLength": 1 },
+        "workflowFile": { "type": "string", "minLength": 1 },
+        "workflowSha256": { "$ref": "#/$defs/sha256Hex" },
+        "startedAtUtc": { "$ref": "#/$defs/utcTimestamp" },
+        "finishedAtUtc": { "$ref": "#/$defs/utcTimestamp" }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sdkRequested", "sdkRollForward", "sdkResolved", "sdkMatchesRequested"],
+      "properties": {
+        "sdkRequested": { "type": "string", "minLength": 1 },
+        "sdkRollForward": { "type": "string", "minLength": 1 },
+        "sdkResolved": { "type": "string", "minLength": 1 },
+        "sdkMatchesRequested": { "type": "boolean" },
+        "msbuildVersion": { "type": "string", "minLength": 1 },
+        "runtimeVersions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["os", "imageName", "imageVersion", "label"],
+          "properties": {
+            "os": { "type": "string", "minLength": 1 },
+            "imageName": { "type": "string", "minLength": 1 },
+            "imageVersion": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "sha", "tag"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "sha": { "type": "string", "minLength": 1 },
+              "tag": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trxFile", "trxSha256", "total", "executed", "passed", "failed", "notExecuted", "error", "timeout", "aborted", "outcome"],
+      "properties": {
+        "framework": { "type": "string", "minLength": 1 },
+        "trxFile": { "type": "string", "minLength": 1 },
+        "trxSha256": { "type": "string", "minLength": 1 },
+        "total": { "$ref": "#/$defs/count" },
+        "executed": { "$ref": "#/$defs/count" },
+        "passed": { "$ref": "#/$defs/count" },
+        "failed": { "$ref": "#/$defs/count" },
+        "notExecuted": { "$ref": "#/$defs/count" },
+        "error": { "$ref": "#/$defs/count" },
+        "timeout": { "$ref": "#/$defs/count" },
+        "aborted": { "$ref": "#/$defs/count" },
+        "outcome": { "type": "string", "minLength": 1 },
+        "baseline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["passed", "notExecuted", "failed", "source"],
+          "properties": {
+            "passed": { "$ref": "#/$defs/count" },
+            "notExecuted": { "$ref": "#/$defs/count" },
+            "failed": { "$ref": "#/$defs/count" },
+            "source": { "type": "string", "minLength": 1 }
+          }
+        },
+        "matchesBaseline": { "type": "boolean" }
+      }
+    },
+    "warnings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "method"],
+      "properties": {
+        "count": { "$ref": "#/$defs/count" },
+        "method": { "const": "unique-lines regex 'warning [A-Z]+[0-9]+' in build log" },
+        "codes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/count" } }
+      }
+    },
+    "buildResult": { "$ref": "#/$defs/exitResult" },
+    "testResult": { "$ref": "#/$defs/exitResult" },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceFiles"],
+      "properties": {
+        "evidenceFiles": { "type": "array", "items": { "$ref": "#/$defs/pathFile" } },
+        "buildOutputs": { "type": "array", "items": { "$ref": "#/$defs/pathFile" } },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "bytes", "sha256"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "bytes": { "$ref": "#/$defs/count" },
+              "sha256": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "native": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "lockFile", "trackedBinaryCount", "workspaceDllCount", "verification"],
+      "properties": {
+        "policy": { "const": "no-download; not-in-repo; provenance via native-lock" },
+        "lockFile": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256", "bundleBuildId"],
+              "properties": {
+                "path": { "type": "string", "minLength": 1 },
+                "sha256": { "type": "string", "minLength": 1 },
+                "bundleBuildId": { "type": "string", "minLength": 1 }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "lockMissingReason": { "type": "string", "minLength": 1 },
+        "trackedBinaryCount": { "$ref": "#/$defs/count" },
+        "workspaceDllCount": { "$ref": "#/$defs/count" },
+        "verification": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "reason"],
+              "properties": {
+                "status": { "const": "NOT_APPLICABLE" },
+                "reason": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "expected", "matched", "mismatches"],
+              "properties": {
+                "status": { "enum": ["MATCH", "MISMATCH"] },
+                "expected": { "$ref": "#/$defs/count" },
+                "matched": { "$ref": "#/$defs/count" },
+                "mismatches": { "type": "array" }
+              }
+            }
+          ]
+        }
+      },
+      "if": { "properties": { "lockFile": { "type": "null" } }, "required": ["lockFile"] },
+      "then": { "required": ["lockMissingReason"] }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "scriptSha256"],
+      "properties": {
+        "script": { "type": "string", "minLength": 1 },
+        "scriptSha256": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidenceClass": { "enum": ["CI", "LOCAL"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "manifestKind": { "const": "ci" } }, "required": ["manifestKind"] },
+      "then": {
+        "properties": {
+          "buildId": { "pattern": "^CI-[0-9]+-[0-9]+-(release|diag)$" },
+          "evidenceClass": { "const": "CI" },
+          "run": {
+            "properties": {
+              "runId": { "type": "integer" },
+              "runAttempt": { "type": "integer" }
+            }
+          },
+          "toolchain": { "required": ["runner", "actions"] },
+          "artifacts": { "properties": { "packages": { "maxItems": 0 } } },
+          "native": { "properties": { "verification": { "properties": { "status": { "const": "NOT_APPLICABLE" } } } } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "manifestKind": { "const": "local" } }, "required": ["manifestKind"] },
+      "then": {
+        "properties": {
+          "buildId": { "pattern": "^BLD-" },
+          "evidenceClass": { "const": "LOCAL" },
+          "run": { "properties": { "runId": { "type": "null" } } },
+          "native": { "properties": { "verification": { "properties": { "status": { "enum": ["MATCH", "MISMATCH"] } } } } }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha1Hex": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "utcTimestamp": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$" },
+    "count": { "type": "integer", "minimum": 0 },
+    "exitResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exitCode"],
+      "properties": { "exitCode": { "type": "integer" } }
+    },
+    "pathFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "bytes": { "$ref": "#/$defs/count" },
+        "sha256": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
