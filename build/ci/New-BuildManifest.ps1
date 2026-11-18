@@ -566,9 +566,14 @@ $json = $m | ConvertTo-Json -Depth 32
 
 if ($SchemaFile) {
     if ($PSVersionTable.PSVersion -lt [version]'7.4') { Write-Err "SCHEMA FAIL: BLOCKED: Test-Json (Draft 2020-12) needs pwsh >= 7.4, running $($PSVersionTable.PSVersion)"; exit 3 }
+    # the schema must exist and parse as JSON before Test-Json; Test-Json reports an unreadable schema
+    # as an error record while still returning True, so any error record is a failure (fail-closed)
+    try { $null = Get-Content -LiteralPath $SchemaFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+    catch { Write-Err "SCHEMA FAIL: schema file unreadable: ${SchemaFile}: $($_.Exception.Message)"; exit 3 }
     $tjErr = $null
-    $okSchema = Test-Json -Json $json -SchemaFile $SchemaFile -ErrorAction SilentlyContinue -ErrorVariable tjErr
-    if (-not $okSchema) { foreach ($e in @($tjErr)) { Write-Err "SCHEMA FAIL: $e" }; if (-not $tjErr) { Write-Err 'SCHEMA FAIL' }; exit 3 }
+    try { $okSchema = Test-Json -Json $json -SchemaFile $SchemaFile -ErrorAction SilentlyContinue -ErrorVariable tjErr }
+    catch { Write-Err "SCHEMA FAIL: Test-Json: $($_.Exception.Message)"; exit 3 }
+    if (-not $okSchema -or @($tjErr).Count -gt 0) { foreach ($e in @($tjErr)) { Write-Err "SCHEMA FAIL: $e" }; if (@($tjErr).Count -eq 0) { Write-Err 'SCHEMA FAIL' }; exit 3 }
 }
 
 $outDir = Split-Path -Parent $OutFull

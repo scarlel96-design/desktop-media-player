@@ -1,0 +1,7 @@
+{
+  "description": "01b-5 negative (generate): -SchemaFile path does not exist => pre-check fails => exit 3, no file",
+  "baseCase": "normal",
+  "schemaFile": "does-not-exist.schema.json",
+  "expectExit": 3,
+  "expectStderr": "SCHEMA FAIL: schema file unreadable: "
+}

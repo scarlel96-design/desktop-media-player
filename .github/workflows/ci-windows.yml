@@ -98,8 +98,10 @@ jobs:
           if ($PSVersionTable.PSVersion -lt [version]'7.4') { Write-Output "::error::BLOCKED: pwsh $($PSVersionTable.PSVersion) < 7.4 (Test-Json Draft 2020-12)"; exit 3 }
           $mf = "artifacts/build-manifest-${{ matrix.flavor }}.json"
           if (-not (Test-Path -LiteralPath $mf)) { Write-Output "::error::manifest not found: $mf"; exit 1 }
-          $ok = Test-Json -Json (Get-Content -LiteralPath $mf -Raw) -SchemaFile build/manifest/build-manifest.schema.json -ErrorAction SilentlyContinue -ErrorVariable tjErr
-          if (-not $ok) { foreach ($e in $tjErr) { Write-Output "::error::Test-Json: $e" }; Write-Output "::error::Test-Json FAIL: $mf"; exit 3 }
+          $sf = 'build/manifest/build-manifest.schema.json'
+          try { $null = Get-Content -LiteralPath $sf -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop } catch { Write-Output "::error::schema unreadable: ${sf}: $($_.Exception.Message)"; exit 3 }
+          try { $ok = Test-Json -Json (Get-Content -LiteralPath $mf -Raw) -SchemaFile $sf -ErrorAction SilentlyContinue -ErrorVariable tjErr } catch { Write-Output "::error::Test-Json: $($_.Exception.Message)"; exit 3 }
+          if (-not $ok -or @($tjErr).Count -gt 0) { foreach ($e in @($tjErr)) { Write-Output "::error::Test-Json: $e" }; Write-Output "::error::Test-Json FAIL: $mf"; exit 3 }
           Write-Output "Test-Json OK: $mf"
           ./build/ci/New-BuildManifest.ps1 -CheckManifest $mf
           exit $LASTEXITCODE

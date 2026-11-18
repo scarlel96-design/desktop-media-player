@@ -1,0 +1,7 @@
+{
+  "description": "01b-5 negative (generate): schema truncated to its first 200 bytes (corrupt JSON) => pre-check fails => exit 3, no file",
+  "baseCase": "normal",
+  "schemaFile": "schema-truncated.schema.json",
+  "expectExit": 3,
+  "expectStderr": "SCHEMA FAIL: schema file unreadable: "
+}

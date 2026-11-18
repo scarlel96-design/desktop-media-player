@@ -1,0 +1,7 @@
+{
+  "description": "01b-5 negative (generate): schema is valid JSON but not a usable schema; Test-Json returns True with an error record (fail-open before 01b-5) => exit 3, no file",
+  "baseCase": "normal",
+  "schemaFile": "schema-not-a-schema.schema.json",
+  "expectExit": 3,
+  "expectStderr": "SCHEMA FAIL: Cannot parse the JSON schema."
+}

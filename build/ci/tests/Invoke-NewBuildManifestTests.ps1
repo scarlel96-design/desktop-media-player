@@ -3,12 +3,16 @@
   CIF-01b-3 unit checks for build/ci/New-BuildManifest.ps1 (errata v1.0.2 E8-3). Plain pwsh, no Pester.
 .DESCRIPTION
   - E8 positive fixtures (fixtures/normal, fixtures/build-fail, fixtures/missing-imageversion)
-    and edge case fixtures/test-exit-missing (ci, build 0, Test exit code empty => Test fields STEP_NOT_RUN):
+    and edge cases fixtures/test-exit-missing (ci, build 0, Test exit code empty => Test fields STEP_NOT_RUN)
+    and fixtures/build-not-run (ci, Build and Test exit codes empty, stale trx present => not read, STEP_NOT_RUN):
     generator exit 0, Test-Json against build/manifest/build-manifest.schema.json passes,
     -CheckManifest self-check passes, missingFields equals the expected list.
   - Negative generation cases (fixtures/negative/*.case.json): expected non-zero exit + message, no file written.
-  - Negative static manifests (fixtures/negative/*.manifest.json): schema passes (schema cannot see it)
-    but the self-check rejects them with the expected message.
+    A case may name a fixture "schemaFile" passed as -SchemaFile (schema reject, corrupt, missing => exit 3).
+  - Negative static manifests (fixtures/negative/*.manifest.json): Test-Json result must equal "schemaValid"
+    and the self-check exit/message must match.
+  - Test-Json counts as passed only when it returns True AND reports no error record (fail-closed).
+  - The schema must parse as JSON before any case runs, and the total case count is fixed ($ExpectedCaseCount).
   Inputs are synthetic fixtures. A throw-away git repo is built in -OutDir from copies of the
   repository files the generator reads; nothing outside -OutDir is written. A stub `dotnet`
   (prints the fixture SDK version only) is put first on PATH. Requires pwsh >= 7.4 (Test-Json 2020-12).
@@ -24,9 +28,12 @@ $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 $gen = Join-Path $repo 'build/ci/New-BuildManifest.ps1'
 $schema = Join-Path $repo 'build/manifest/build-manifest.schema.json'
 $fx = Join-Path $PSScriptRoot 'fixtures'
+$ExpectedCaseCount = 18
 $envNames = 'GITHUB_REPOSITORY', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'GITHUB_SHA', 'GITHUB_EVENT_PATH', 'GITHUB_RUN_ID',
 'GITHUB_RUN_ATTEMPT', 'GITHUB_SERVER_URL', 'GITHUB_WORKFLOW_REF', 'RUNNER_OS', 'ImageOS', 'ImageVersion'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+try { $null = Get-Content -LiteralPath $schema -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+catch { [Console]::Error.WriteLine("FAIL: schema unreadable: ${schema}: $($_.Exception.Message)"); exit 1 }
 
 # throw-away repo with copies of the files the generator reads
 $tmpRepo = Join-Path $OutDir 'repo'
@@ -55,9 +62,12 @@ function Set-DotnetStub([string]$ver) {
 }
 
 function Test-Schema([string]$path) {
+    # passed only when Test-Json returns True and reports no error record (an unreadable schema gives True + an error)
     $e = $null
-    $ok = Test-Json -Json (Get-Content -LiteralPath $path -Raw) -SchemaFile $schema -ErrorAction SilentlyContinue -ErrorVariable e
-    return @{ Ok = [bool]$ok; Errors = @($e | ForEach-Object { "$_" }) }
+    try { $ok = Test-Json -Json (Get-Content -LiteralPath $path -Raw) -SchemaFile $schema -ErrorAction SilentlyContinue -ErrorVariable e }
+    catch { return @{ Ok = $false; Errors = @("Test-Json threw: $($_.Exception.Message)") } }
+    $errs = @($e | ForEach-Object { "$_" })
+    return @{ Ok = ([bool]$ok -and $errs.Count -eq 0); Errors = $errs }
 }
 
 function Invoke-Gen([System.Collections.IDictionary]$params, [string]$logBase) {
@@ -95,7 +105,7 @@ function Add-Row([string]$case, [string]$kind, $expExit, $actExit, [string[]]$ch
 }
 
 # --- positive E8 fixtures
-foreach ($name in 'normal', 'build-fail', 'missing-imageversion', 'test-exit-missing') {
+foreach ($name in 'normal', 'build-fail', 'missing-imageversion', 'test-exit-missing', 'build-not-run') {
     $dir = Join-Path $fx $name
     $case = Get-Content -LiteralPath (Join-Path $dir 'case.json') -Raw | ConvertFrom-Json
     $r = Invoke-Case $name $dir $case $null @()
@@ -122,7 +132,10 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $fx 'negative') -Filter '
     $dir = Join-Path $fx $neg.baseCase
     $case = Get-Content -LiteralPath (Join-Path $dir 'case.json') -Raw | ConvertFrom-Json
     $unset = if ($neg.PSObject.Properties['unsetEnv']) { @($neg.unsetEnv) } else { @() }
-    $ov = if ($neg.PSObject.Properties['args']) { $neg.args } else { $null }
+    $ovh = [ordered]@{}
+    if ($neg.PSObject.Properties['args']) { foreach ($p in $neg.args.PSObject.Properties) { $ovh[$p.Name] = $p.Value } }
+    if ($neg.PSObject.Properties['schemaFile']) { $ovh['SchemaFile'] = Join-Path (Join-Path $fx 'negative') $neg.schemaFile }
+    $ov = if ($ovh.Count) { [pscustomobject]$ovh } else { $null }
     $name = $f.Name -replace '\.case\.json$', ''
     $r = Invoke-Case $name $dir $case $ov $unset
     $probs = [System.Collections.Generic.List[string]]::new()
@@ -151,5 +164,6 @@ $rows | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'r
 Write-Output "pwsh $($PSVersionTable.PSVersion); OutDir $OutDir"
 foreach ($row in $rows) { Write-Output ("[{0}] {1} ({2}) expected exit {3}, actual {4} :: {5}{6}" -f $row.result, $row.case, $row.type, $row.expectedExit, $row.actualExit, $row.checks, $(if ($row.problems.Count) { ' :: ' + ($row.problems -join ' | ') } else { '' })) }
 $bad = @($rows | Where-Object { $_.result -ne 'OK' }).Count
-Write-Output "cases $($rows.Count), mismatches $bad"
+Write-Output "cases $($rows.Count) (expected $ExpectedCaseCount), mismatches $bad"
+if ($rows.Count -ne $ExpectedCaseCount) { Write-Output "[MISMATCH] case count $($rows.Count) != expected $ExpectedCaseCount"; exit 1 }
 exit $(if ($bad -eq 0) { 0 } else { 1 })
