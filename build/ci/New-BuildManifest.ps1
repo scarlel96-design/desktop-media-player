@@ -15,7 +15,9 @@
     native.policy, warnings.method, missingFields) are never null. If one cannot be produced
     the script exits non-zero without writing (E2-2).
   - Self-check runs before writing (E3): null <-> missingFields both ways, no duplicate field,
-    ci: buildId == "CI-{runId}-{runAttempt}-{flavor}".
+    ci: buildId == "CI-{runId}-{runAttempt}-{flavor}", run.startedAtUtc <= run.finishedAtUtc when both present.
+  - run.startedAtUtc / run.finishedAtUtc come from trx Times @start / @finish (UTC).
+  - ci: an empty -BuildExitCode / -TestExitCode means that step did not run; its fields are STEP_NOT_RUN.
   - Runner image values come only from env ImageOS / ImageVersion (E9).
 
   Exit codes: 0 written; 1 generation failure; 2 self-check failure; 3 schema check failure.
@@ -156,6 +158,21 @@ function Test-ManifestSelfCheck($m) {
             if ($m['buildId'] -cne $exp) { $errs.Add("ci buildId mismatch: buildId '$($m['buildId'])' != expected '$exp'") }
         }
     }
+
+    # run.startedAtUtc <= run.finishedAtUtc when both present
+    $runObj = $m['run']
+    if ($runObj -is [System.Collections.IDictionary] -and $null -ne $runObj['startedAtUtc'] -and $null -ne $runObj['finishedAtUtc']) {
+        $toUtc = {
+            param($x)
+            if ($x -is [DateTime]) { return $x.ToUniversalTime() }
+            $d = [DateTimeOffset]::MinValue
+            if ($x -is [string] -and [DateTimeOffset]::TryParse($x, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$d)) { return $d.UtcDateTime }
+            return $null
+        }
+        $s0 = & $toUtc $runObj['startedAtUtc']; $f0 = & $toUtc $runObj['finishedAtUtc']
+        if ($null -eq $s0 -or $null -eq $f0) { $errs.Add('run.startedAtUtc/run.finishedAtUtc not parseable as UTC timestamps') }
+        elseif ($s0 -gt $f0) { $errs.Add("run.startedAtUtc '$($s0.ToString('o'))' is later than run.finishedAtUtc '$($f0.ToString('o'))'") }
+    }
     return $errs
 }
 
@@ -172,7 +189,6 @@ if ($PSCmdlet.ParameterSetName -eq 'Check') {
 }
 
 # ---------------- generation ----------------
-$startedAtUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
 $missing = [System.Collections.Generic.List[object]]::new()
 function Add-Missing([string]$field, [string]$reason, [string]$detail) {
     $e = [ordered]@{ field = $field; reason = $reason }
@@ -302,11 +318,15 @@ try {
     Set-Measured $src 'treeClean' 'source.treeClean' $clean $(if ($st.Found) { 'SOURCE_PARSE_FAILED' } else { 'NOT_PROVIDED_BY_ENV' }) 'git status --porcelain failed'
     $m['source'] = $src
 
-    # tests (trx) -- parsed first: run.finishedAtUtc comes from trx Times
-    $testsNotRun = ($null -eq $testExit) -and ($null -ne $buildExit) -and ($buildExit -ne 0)
+    # tests (trx) -- parsed first: run.startedAtUtc / run.finishedAtUtc come from trx Times
+    # ci: empty -TestExitCode => Test step not run (regardless of build); local: only when build failed
+    $testsNotRun = if ($Kind -eq 'ci') { $null -eq $testExit } else { ($null -eq $testExit) -and ($null -ne $buildExit) -and ($buildExit -ne 0) }
+    $buildNotRun = ($Kind -eq 'ci') -and ($null -eq $buildExit)
+    $bxText = if ($null -eq $buildExit) { 'not supplied' } else { [string]$buildExit }
+    $testNotRunDetail = "Test exit code not supplied (build exit code $bxText); Test step not run"
     $trxFull = Resolve-Under $ArtifactsDir $TrxFile
     $trx = $null; $trxReason = $null; $trxDetail = $null
-    if ($testsNotRun) { $trxReason = 'STEP_NOT_RUN'; $trxDetail = "build exit code $buildExit; Test step not run" }
+    if ($testsNotRun) { $trxReason = 'STEP_NOT_RUN'; $trxDetail = $testNotRunDetail }
     elseif (-not (Test-Path -LiteralPath $trxFull -PathType Leaf)) { $trxReason = 'SOURCE_FILE_MISSING'; $trxDetail = "trx not found: $(Get-RelPath $ArtifactsDir $trxFull)" }
     else {
         try { [xml]$trx = Get-Content -LiteralPath $trxFull -Raw } catch { $trx = $null; $trxReason = 'SOURCE_PARSE_FAILED'; $trxDetail = 'trx is not valid XML' }
@@ -354,16 +374,16 @@ try {
     $wfFull = if ($wf) { Resolve-Under $RepoRoot $wf } else { $null }
     $wfExists = $wfFull -and (Test-Path -LiteralPath $wfFull -PathType Leaf)
     Set-Measured $run 'workflowSha256' 'run.workflowSha256' $(if ($wfExists) { Get-Sha256 $wfFull } else { $null }) $(if ($wf) { 'SOURCE_FILE_MISSING' } else { 'SOURCE_PARSE_FAILED' }) 'workflow file not found'
-    $run['startedAtUtc'] = $startedAtUtc
-    $fin = $null
-    if ($trx) {
-        $rawFin = Get-TrxAttr '/t:TestRun/t:Times' 'finish'
+    foreach ($pair in @(@('startedAtUtc', 'start'), @('finishedAtUtc', 'finish'))) {
+        if (-not $trx) { Set-Measured $run $pair[0] "run.$($pair[0])" $null $trxReason $trxDetail; continue }
+        $raw = Get-TrxAttr '/t:TestRun/t:Times' $pair[1]
+        $ts = $null
         $dto = [DateTimeOffset]::MinValue
-        if ($rawFin -and [DateTimeOffset]::TryParse($rawFin, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$dto)) {
-            $fin = $dto.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ', [Globalization.CultureInfo]::InvariantCulture)
+        if ($raw -and [DateTimeOffset]::TryParse($raw, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$dto)) {
+            $ts = $dto.UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ', [Globalization.CultureInfo]::InvariantCulture)
         }
-        Set-Measured $run 'finishedAtUtc' 'run.finishedAtUtc' $fin 'SOURCE_PARSE_FAILED' 'trx Times/@finish not readable'
-    } else { Set-Measured $run 'finishedAtUtc' 'run.finishedAtUtc' $null $trxReason $trxDetail }
+        Set-Measured $run $pair[0] "run.$($pair[0])" $ts 'SOURCE_PARSE_FAILED' "trx Times/@$($pair[1]) not readable"
+    }
     $m['run'] = $run
 
     # toolchain
@@ -451,9 +471,10 @@ try {
     $m['warnings'] = $w
 
     $m['buildResult'] = [ordered]@{}
-    Set-Measured $m['buildResult'] 'exitCode' 'buildResult.exitCode' $buildExit 'NOT_PROVIDED_BY_ENV' '-BuildExitCode not supplied'
+    if ($buildNotRun) { Set-Measured $m['buildResult'] 'exitCode' 'buildResult.exitCode' $null 'STEP_NOT_RUN' 'Build exit code not supplied; Build step not run' }
+    else { Set-Measured $m['buildResult'] 'exitCode' 'buildResult.exitCode' $buildExit 'NOT_PROVIDED_BY_ENV' '-BuildExitCode not supplied' }
     $m['testResult'] = [ordered]@{}
-    if ($testsNotRun) { Set-Measured $m['testResult'] 'exitCode' 'testResult.exitCode' $null 'STEP_NOT_RUN' "build exit code $buildExit; Test step not run" }
+    if ($testsNotRun) { Set-Measured $m['testResult'] 'exitCode' 'testResult.exitCode' $null 'STEP_NOT_RUN' $testNotRunDetail }
     else { Set-Measured $m['testResult'] 'exitCode' 'testResult.exitCode' $testExit 'NOT_PROVIDED_BY_ENV' '-TestExitCode not supplied' }
 
     # artifacts

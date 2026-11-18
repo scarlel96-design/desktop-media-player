@@ -1,0 +1,44 @@
+{
+  "description": "edge (line ~306 rule): ci, build 0, Test exit code empty => Test step fields STEP_NOT_RUN even though a trx file exists",
+  "kind": "ci",
+  "flavor": "release",
+  "args": {
+    "Configuration": "Release",
+    "MsbuildExtra": "",
+    "BuildExitCode": "0",
+    "TestExitCode": "",
+    "BuildLogFile": "build-release-log.txt"
+  },
+  "env": {
+    "GITHUB_REPOSITORY": "fixture-owner/fixture-repo",
+    "GITHUB_EVENT_NAME": "pull_request",
+    "GITHUB_REF": "refs/pull/1/merge",
+    "GITHUB_SHA": "3333333333333333333333333333333333333333",
+    "GITHUB_RUN_ID": "1000004",
+    "GITHUB_RUN_ATTEMPT": "1",
+    "GITHUB_SERVER_URL": "https://github.com",
+    "GITHUB_WORKFLOW_REF": "fixture-owner/fixture-repo/.github/workflows/ci-windows.yml@refs/pull/1/merge",
+    "RUNNER_OS": "Windows",
+    "ImageOS": "fixture-image-os",
+    "ImageVersion": "fixture-image-version"
+  },
+  "eventPayload": "event.json",
+  "dotnetVersion": "10.0.403",
+  "expectExit": 0,
+  "expectMissingFields": [
+    "run.startedAtUtc:STEP_NOT_RUN",
+    "run.finishedAtUtc:STEP_NOT_RUN",
+    "tests.trxFile:STEP_NOT_RUN",
+    "tests.trxSha256:STEP_NOT_RUN",
+    "tests.total:STEP_NOT_RUN",
+    "tests.executed:STEP_NOT_RUN",
+    "tests.passed:STEP_NOT_RUN",
+    "tests.failed:STEP_NOT_RUN",
+    "tests.notExecuted:STEP_NOT_RUN",
+    "tests.error:STEP_NOT_RUN",
+    "tests.timeout:STEP_NOT_RUN",
+    "tests.aborted:STEP_NOT_RUN",
+    "tests.outcome:STEP_NOT_RUN",
+    "testResult.exitCode:STEP_NOT_RUN"
+  ]
+}

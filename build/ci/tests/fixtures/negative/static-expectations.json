@@ -28,5 +28,11 @@
     "schemaValid": true,
     "expectExit": 2,
     "expectStderr": "missingFields duplicate field 'toolchain.runner.imageVersion'"
+  },
+  "started-after-finished.manifest.json": {
+    "description": "KD-1 negative: run.startedAtUtc later than run.finishedAtUtc",
+    "schemaValid": true,
+    "expectExit": 2,
+    "expectStderr": "run.startedAtUtc '2099-01-01T00:00:07.0000000Z' is later than run.finishedAtUtc '2099-01-01T00:00:06.5000000Z'"
   }
 }

@@ -2,7 +2,8 @@
 .SYNOPSIS
   CIF-01b-3 unit checks for build/ci/New-BuildManifest.ps1 (errata v1.0.2 E8-3). Plain pwsh, no Pester.
 .DESCRIPTION
-  - E8 positive fixtures (fixtures/normal, fixtures/build-fail, fixtures/missing-imageversion):
+  - E8 positive fixtures (fixtures/normal, fixtures/build-fail, fixtures/missing-imageversion)
+    and edge case fixtures/test-exit-missing (ci, build 0, Test exit code empty => Test fields STEP_NOT_RUN):
     generator exit 0, Test-Json against build/manifest/build-manifest.schema.json passes,
     -CheckManifest self-check passes, missingFields equals the expected list.
   - Negative generation cases (fixtures/negative/*.case.json): expected non-zero exit + message, no file written.
@@ -94,7 +95,7 @@ function Add-Row([string]$case, [string]$kind, $expExit, $actExit, [string[]]$ch
 }
 
 # --- positive E8 fixtures
-foreach ($name in 'normal', 'build-fail', 'missing-imageversion') {
+foreach ($name in 'normal', 'build-fail', 'missing-imageversion', 'test-exit-missing') {
     $dir = Join-Path $fx $name
     $case = Get-Content -LiteralPath (Join-Path $dir 'case.json') -Raw | ConvertFrom-Json
     $r = Invoke-Case $name $dir $case $null @()

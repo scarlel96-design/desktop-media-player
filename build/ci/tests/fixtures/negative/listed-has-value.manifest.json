@@ -22,7 +22,7 @@
     "jobUrl": "https://github.com/fixture-owner/fixture-repo/actions/runs/1000001",
     "workflowFile": ".github/workflows/ci-windows.yml",
     "workflowSha256": "643e056065c9fedf42201ca832b2aedd4b2af5c496c9805ea73f4349155fb72f",
-    "startedAtUtc": "2099-01-01T00:00:00Z",
+    "startedAtUtc": "2099-01-01T00:00:01.0000000Z",
     "finishedAtUtc": "2099-01-01T00:00:06.5000000Z"
   },
   "toolchain": {
@@ -115,7 +115,7 @@
   },
   "generator": {
     "script": "build/ci/New-BuildManifest.ps1",
-    "scriptSha256": "fe91d174289960989ecbb2ed08c148744be82589e70b58f165d89d0a4a774be8"
+    "scriptSha256": "0b2f8a4e11730dbd0f6d16c688941420f10ea3b0fe4a4b4edb25ea7abb32e3e1"
   },
   "evidenceClass": "CI",
   "missingFields": [

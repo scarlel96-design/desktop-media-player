@@ -12,7 +12,7 @@
   "dotnetVersion": "10.0.403",
   "expectExit": 0,
   "expectMissingFields": [
-    "run.finishedAtUtc:STEP_NOT_RUN",
+    "run.startedAtUtc:STEP_NOT_RUN", "run.finishedAtUtc:STEP_NOT_RUN",
     "tests.trxFile:STEP_NOT_RUN", "tests.trxSha256:STEP_NOT_RUN",
     "tests.total:STEP_NOT_RUN", "tests.executed:STEP_NOT_RUN", "tests.passed:STEP_NOT_RUN", "tests.failed:STEP_NOT_RUN",
     "tests.notExecuted:STEP_NOT_RUN", "tests.error:STEP_NOT_RUN", "tests.timeout:STEP_NOT_RUN", "tests.aborted:STEP_NOT_RUN",
