@@ -58,6 +58,8 @@ internal sealed class FakePlaybackEngine : IPlaybackEngine, INativeRuntimeProbe
         _position = seconds;
     }
 
+    public void SeekRelative(double deltaSeconds, SeekPrecision precision) { Calls.Add($"SeekRelative:{deltaSeconds}:{precision}"); _position = Math.Max(0, _position + deltaSeconds); }
+
     public void SetVolume(int volume)
     {
         Calls.Add($"SetVolume:{volume}");

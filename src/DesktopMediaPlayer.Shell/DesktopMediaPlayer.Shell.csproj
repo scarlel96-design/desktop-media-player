@@ -17,4 +17,7 @@
   <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\native\win-x64\libmpv-2.dll')">
     <None Include="..\..\native\win-x64\*" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
+  <ItemGroup Condition="'$(DmpDiag)'!='true'">
+    <Compile Remove="DiagSeekRunner.cs" />
+  </ItemGroup>
 </Project>

@@ -17,11 +17,8 @@ public sealed class FileResumeStore : IResumeStore
     public FileResumeStore(SpikeLogger? logger = null)
     {
         _logger = logger;
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "desktop-media-player");
-        Directory.CreateDirectory(dir);
-        _filePath = Path.Combine(dir, "resume.json");
+        _filePath = AppDataPaths.Current.Resume;
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
         Load();
     }
 

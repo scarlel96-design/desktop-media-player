@@ -1,0 +1,7 @@
+{
+  "description": "01b-5 negative (generate): valid schema that rejects the manifest => Test-Json False => exit 3, no file",
+  "baseCase": "normal",
+  "schemaFile": "schema-strict.schema.json",
+  "expectExit": 3,
+  "expectStderr": "SCHEMA FAIL: The JSON is not valid with the schema"
+}

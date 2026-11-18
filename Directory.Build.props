@@ -9,4 +9,8 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+  <!-- DIAG build only: dotnet build -p:DmpDiag=true. Appends DMP_DIAG, keeps TRACE/RELEASE/NET* constants. -->
+  <PropertyGroup Condition="'$(DmpDiag)'=='true'">
+    <DefineConstants>$(DefineConstants);DMP_DIAG</DefineConstants>
+  </PropertyGroup>
 </Project>

@@ -1,0 +1,7 @@
+{
+  "description": "negative (generate): ci without GITHUB_RUN_ID => generated field buildId cannot be produced (E2-2), no file",
+  "baseCase": "normal",
+  "unsetEnv": ["GITHUB_RUN_ID"],
+  "expectExit": 1,
+  "expectStderr": "GENERATE FAIL: buildId cannot be produced: GITHUB_RUN_ID missing or not an integer"
+}
