@@ -2,38 +2,55 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/scarlel96-design/desktop-media-player/build/manifest/build-manifest.schema.json",
   "title": "DMP Build Manifest (M-B) v1.0",
-  "description": "CIF-01b design v1.0 LOCK section 3.1. Measured values only; no verdicts (PASS/FAIL/Gate). artifacts.uploadDigest is intentionally not part of the manifest.",
+  "description": "CIF-01b design v1.0 LOCK section 3.1. Measured values only; no verdicts (PASS/FAIL/Gate). artifacts.uploadDigest is intentionally not part of the manifest. Errata v1.0.1 (69c93f0c): measured fields are nullable and must then be listed in missingFields; all sha256 values are lowercase 64 hex.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schemaVersion", "manifestKind", "buildId", "flavor", "configuration", "msbuildProperties",
-    "platform", "targetFramework", "source", "run", "toolchain", "tests", "warnings",
-    "buildResult", "testResult", "artifacts", "native", "generator", "evidenceClass"
+    "schemaVersion",
+    "manifestKind",
+    "buildId",
+    "flavor",
+    "configuration",
+    "msbuildProperties",
+    "platform",
+    "targetFramework",
+    "source",
+    "run",
+    "toolchain",
+    "tests",
+    "warnings",
+    "buildResult",
+    "testResult",
+    "artifacts",
+    "native",
+    "generator",
+    "evidenceClass",
+    "missingFields"
   ],
   "properties": {
     "schemaVersion": { "const": "1.0" },
     "manifestKind": { "enum": ["ci", "local"] },
     "buildId": { "type": "string", "minLength": 1 },
     "flavor": { "enum": ["release", "diag"] },
-    "configuration": { "type": "string", "minLength": 1 },
+    "configuration": { "type": ["string", "null"], "minLength": 1 },
     "msbuildProperties": {
-      "type": "object",
+      "type": ["object", "null"],
       "additionalProperties": { "type": "string" }
     },
-    "platform": { "type": "string", "minLength": 1 },
-    "targetFramework": { "type": "string", "minLength": 1 },
+    "platform": { "type": ["string", "null"], "minLength": 1 },
+    "targetFramework": { "type": ["string", "null"], "minLength": 1 },
     "source": {
       "type": "object",
       "additionalProperties": false,
       "required": ["repository", "event", "ref", "headSha", "checkoutSha", "treeClean"],
       "properties": {
-        "repository": { "type": "string", "minLength": 1 },
-        "event": { "type": "string", "minLength": 1 },
-        "ref": { "type": "string", "minLength": 1 },
-        "headSha": { "$ref": "#/$defs/sha1Hex" },
-        "checkoutSha": { "$ref": "#/$defs/sha1Hex" },
+        "repository": { "type": ["string", "null"], "minLength": 1 },
+        "event": { "type": ["string", "null"], "minLength": 1 },
+        "ref": { "type": ["string", "null"], "minLength": 1 },
+        "headSha": { "$ref": "#/$defs/sha1HexOrNull" },
+        "checkoutSha": { "$ref": "#/$defs/sha1HexOrNull" },
         "baseSha": { "$ref": "#/$defs/sha1Hex" },
-        "treeClean": { "type": "boolean" }
+        "treeClean": { "type": ["boolean", "null"] }
       }
     },
     "run": {
@@ -44,10 +61,10 @@
         "runId": { "type": ["integer", "null"], "minimum": 0 },
         "runAttempt": { "type": ["integer", "null"], "minimum": 1 },
         "jobUrl": { "type": "string", "minLength": 1 },
-        "workflowFile": { "type": "string", "minLength": 1 },
-        "workflowSha256": { "$ref": "#/$defs/sha256Hex" },
-        "startedAtUtc": { "$ref": "#/$defs/utcTimestamp" },
-        "finishedAtUtc": { "$ref": "#/$defs/utcTimestamp" }
+        "workflowFile": { "type": ["string", "null"], "minLength": 1 },
+        "workflowSha256": { "$ref": "#/$defs/sha256HexOrNull" },
+        "startedAtUtc": { "$ref": "#/$defs/utcTimestampOrNull" },
+        "finishedAtUtc": { "$ref": "#/$defs/utcTimestampOrNull" }
       }
     },
     "toolchain": {
@@ -55,25 +72,28 @@
       "additionalProperties": false,
       "required": ["sdkRequested", "sdkRollForward", "sdkResolved", "sdkMatchesRequested"],
       "properties": {
-        "sdkRequested": { "type": "string", "minLength": 1 },
-        "sdkRollForward": { "type": "string", "minLength": 1 },
-        "sdkResolved": { "type": "string", "minLength": 1 },
-        "sdkMatchesRequested": { "type": "boolean" },
+        "sdkRequested": { "type": ["string", "null"], "minLength": 1 },
+        "sdkRollForward": { "type": ["string", "null"], "minLength": 1 },
+        "sdkResolved": { "type": ["string", "null"], "minLength": 1 },
+        "sdkMatchesRequested": { "type": ["boolean", "null"] },
         "msbuildVersion": { "type": "string", "minLength": 1 },
-        "runtimeVersions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "runtimeVersions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "runner": {
           "type": "object",
           "additionalProperties": false,
           "required": ["os", "imageName", "imageVersion", "label"],
           "properties": {
-            "os": { "type": "string", "minLength": 1 },
-            "imageName": { "type": "string", "minLength": 1 },
-            "imageVersion": { "type": "string", "minLength": 1 },
-            "label": { "type": "string", "minLength": 1 }
+            "os": { "type": ["string", "null"], "minLength": 1 },
+            "imageName": { "type": ["string", "null"], "minLength": 1 },
+            "imageVersion": { "type": ["string", "null"], "minLength": 1 },
+            "label": { "type": ["string", "null"], "minLength": 1 }
           }
         },
         "actions": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -90,20 +110,32 @@
     "tests": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["trxFile", "trxSha256", "total", "executed", "passed", "failed", "notExecuted", "error", "timeout", "aborted", "outcome"],
+      "required": [
+        "trxFile",
+        "trxSha256",
+        "total",
+        "executed",
+        "passed",
+        "failed",
+        "notExecuted",
+        "error",
+        "timeout",
+        "aborted",
+        "outcome"
+      ],
       "properties": {
         "framework": { "type": "string", "minLength": 1 },
-        "trxFile": { "type": "string", "minLength": 1 },
-        "trxSha256": { "type": "string", "minLength": 1 },
-        "total": { "$ref": "#/$defs/count" },
-        "executed": { "$ref": "#/$defs/count" },
-        "passed": { "$ref": "#/$defs/count" },
-        "failed": { "$ref": "#/$defs/count" },
-        "notExecuted": { "$ref": "#/$defs/count" },
-        "error": { "$ref": "#/$defs/count" },
-        "timeout": { "$ref": "#/$defs/count" },
-        "aborted": { "$ref": "#/$defs/count" },
-        "outcome": { "type": "string", "minLength": 1 },
+        "trxFile": { "type": ["string", "null"], "minLength": 1 },
+        "trxSha256": { "$ref": "#/$defs/sha256HexOrNull" },
+        "total": { "$ref": "#/$defs/countOrNull" },
+        "executed": { "$ref": "#/$defs/countOrNull" },
+        "passed": { "$ref": "#/$defs/countOrNull" },
+        "failed": { "$ref": "#/$defs/countOrNull" },
+        "notExecuted": { "$ref": "#/$defs/countOrNull" },
+        "error": { "$ref": "#/$defs/countOrNull" },
+        "timeout": { "$ref": "#/$defs/countOrNull" },
+        "aborted": { "$ref": "#/$defs/countOrNull" },
+        "outcome": { "type": ["string", "null"], "minLength": 1 },
         "baseline": {
           "type": "object",
           "additionalProperties": false,
@@ -123,9 +155,12 @@
       "additionalProperties": false,
       "required": ["count", "method"],
       "properties": {
-        "count": { "$ref": "#/$defs/count" },
+        "count": { "$ref": "#/$defs/countOrNull" },
         "method": { "const": "unique-lines regex 'warning [A-Z]+[0-9]+' in build log" },
-        "codes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/count" } }
+        "codes": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/count" }
+        }
       }
     },
     "buildResult": { "$ref": "#/$defs/exitResult" },
@@ -135,8 +170,11 @@
       "additionalProperties": false,
       "required": ["evidenceFiles"],
       "properties": {
-        "evidenceFiles": { "type": "array", "items": { "$ref": "#/$defs/pathFile" } },
-        "buildOutputs": { "type": "array", "items": { "$ref": "#/$defs/pathFile" } },
+        "evidenceFiles": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/pathFile" }
+        },
+        "buildOutputs": { "type": "array", "items": {"$ref": "#/$defs/pathFile"} },
         "packages": {
           "type": "array",
           "items": {
@@ -146,7 +184,7 @@
             "properties": {
               "name": { "type": "string", "minLength": 1 },
               "bytes": { "$ref": "#/$defs/count" },
-              "sha256": { "type": "string", "minLength": 1 }
+              "sha256": { "$ref": "#/$defs/sha256Hex" }
             }
           }
         }
@@ -166,7 +204,7 @@
               "required": ["path", "sha256", "bundleBuildId"],
               "properties": {
                 "path": { "type": "string", "minLength": 1 },
-                "sha256": { "type": "string", "minLength": 1 },
+                "sha256": { "$ref": "#/$defs/sha256Hex" },
                 "bundleBuildId": { "type": "string", "minLength": 1 }
               }
             },
@@ -174,8 +212,8 @@
           ]
         },
         "lockMissingReason": { "type": "string", "minLength": 1 },
-        "trackedBinaryCount": { "$ref": "#/$defs/count" },
-        "workspaceDllCount": { "$ref": "#/$defs/count" },
+        "trackedBinaryCount": { "$ref": "#/$defs/countOrNull" },
+        "workspaceDllCount": { "$ref": "#/$defs/countOrNull" },
         "verification": {
           "oneOf": [
             {
@@ -197,11 +235,15 @@
                 "matched": { "$ref": "#/$defs/count" },
                 "mismatches": { "type": "array" }
               }
-            }
+            },
+            { "type": "null" }
           ]
         }
       },
-      "if": { "properties": { "lockFile": { "type": "null" } }, "required": ["lockFile"] },
+      "if": {
+        "properties": { "lockFile": {"type": "null"} },
+        "required": ["lockFile"]
+      },
       "then": { "required": ["lockMissingReason"] }
     },
     "generator": {
@@ -210,38 +252,62 @@
       "required": ["script", "scriptSha256"],
       "properties": {
         "script": { "type": "string", "minLength": 1 },
-        "scriptSha256": { "type": "string", "minLength": 1 }
+        "scriptSha256": { "$ref": "#/$defs/sha256Hex" }
       }
     },
-    "evidenceClass": { "enum": ["CI", "LOCAL"] }
+    "evidenceClass": { "enum": ["CI", "LOCAL"] },
+    "missingFields": {
+      "description": "Errata v1.0.1 E1-E3: one entry per measured field whose value could not be obtained (value is null). Bidirectional null/entry match and field uniqueness are checked by the generator script, not this schema.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "reason"],
+        "properties": {
+          "field": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*(\\.[A-Za-z][A-Za-z0-9]*)*$" },
+          "reason": {
+            "enum": ["NOT_PROVIDED_BY_ENV", "SOURCE_FILE_MISSING", "SOURCE_PARSE_FAILED", "STEP_NOT_RUN"]
+          },
+          "detail": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
   },
   "allOf": [
     {
-      "if": { "properties": { "manifestKind": { "const": "ci" } }, "required": ["manifestKind"] },
+      "if": {
+        "properties": { "manifestKind": {"const": "ci"} },
+        "required": ["manifestKind"]
+      },
       "then": {
         "properties": {
           "buildId": { "pattern": "^CI-[0-9]+-[0-9]+-(release|diag)$" },
           "evidenceClass": { "const": "CI" },
-          "run": {
-            "properties": {
-              "runId": { "type": "integer" },
-              "runAttempt": { "type": "integer" }
-            }
-          },
           "toolchain": { "required": ["runner", "actions"] },
-          "artifacts": { "properties": { "packages": { "maxItems": 0 } } },
-          "native": { "properties": { "verification": { "properties": { "status": { "const": "NOT_APPLICABLE" } } } } }
+          "artifacts": { "properties": {"packages": {"maxItems": 0}} },
+          "native": {
+            "properties": {
+              "verification": { "properties": {"status": {"const": "NOT_APPLICABLE"}} }
+            }
+          }
         }
       }
     },
     {
-      "if": { "properties": { "manifestKind": { "const": "local" } }, "required": ["manifestKind"] },
+      "if": {
+        "properties": { "manifestKind": {"const": "local"} },
+        "required": ["manifestKind"]
+      },
       "then": {
         "properties": {
           "buildId": { "pattern": "^BLD-" },
           "evidenceClass": { "const": "LOCAL" },
-          "run": { "properties": { "runId": { "type": "null" } } },
-          "native": { "properties": { "verification": { "properties": { "status": { "enum": ["MATCH", "MISMATCH"] } } } } }
+          "run": { "properties": {"runId": {"type": "null"}} },
+          "native": {
+            "properties": {
+              "verification": { "properties": {"status": {"enum": ["MATCH", "MISMATCH"]}} }
+            }
+          }
         }
       }
     }
@@ -255,7 +321,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["exitCode"],
-      "properties": { "exitCode": { "type": "integer" } }
+      "properties": { "exitCode": {"type": ["integer", "null"]} }
     },
     "pathFile": {
       "type": "object",
@@ -264,8 +330,14 @@
       "properties": {
         "path": { "type": "string", "minLength": 1 },
         "bytes": { "$ref": "#/$defs/count" },
-        "sha256": { "type": "string", "minLength": 1 }
+        "sha256": { "$ref": "#/$defs/sha256Hex" }
       }
-    }
+    },
+    "sha1HexOrNull": { "oneOf": [{"$ref": "#/$defs/sha1Hex"}, {"type": "null"}] },
+    "sha256HexOrNull": { "oneOf": [{"$ref": "#/$defs/sha256Hex"}, {"type": "null"}] },
+    "utcTimestampOrNull": {
+      "oneOf": [{"$ref": "#/$defs/utcTimestamp"}, {"type": "null"}]
+    },
+    "countOrNull": { "oneOf": [{"$ref": "#/$defs/count"}, {"type": "null"}] }
   }
 }

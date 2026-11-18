@@ -6,8 +6,17 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schemaVersion", "bundleBuildId", "bundleZip", "builtAtUtc", "buildToolchain", "obtainedBy",
-    "license", "components", "files", "evidenceRefs", "knownGaps"
+    "schemaVersion",
+    "bundleBuildId",
+    "bundleZip",
+    "builtAtUtc",
+    "buildToolchain",
+    "obtainedBy",
+    "license",
+    "components",
+    "files",
+    "evidenceRefs",
+    "knownGaps"
   ],
   "properties": {
     "schemaVersion": { "const": "1.0" },
@@ -18,7 +27,7 @@
       "required": ["name", "sha256", "bytes"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
-        "sha256": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256Hex" },
         "bytes": { "type": "integer", "minimum": 0 }
       }
     },
@@ -71,7 +80,7 @@
         "required": ["name", "sha256", "component"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
-          "sha256": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256Hex" },
           "component": { "type": "string", "minLength": 1 }
         }
       }
@@ -85,17 +94,21 @@
         "required": ["name", "sha256"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
-          "sha256": { "type": "string", "minLength": 1 }
+          "sha256": { "$ref": "#/$defs/sha256Hex" }
         }
       }
     },
-    "knownGaps": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+    "knownGaps": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
   },
   "$defs": {
     "configFlag": {
       "description": "Literal 0/1 value transcribed from config.h (CONFIG_GPL, CONFIG_NONFREE, CONFIG_VERSION3, HAVE_GPL).",
       "type": "integer",
       "enum": [0, 1]
-    }
+    },
+    "sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   }
 }
