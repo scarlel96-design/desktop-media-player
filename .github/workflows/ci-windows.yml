@@ -1,5 +1,8 @@
 # CI-FOUNDATION-01 / CIF-01a: minimal Windows CI (build + unit tests, Release and DIAG).
 # Pivot Master Directive v1.0 section 23: native DLLs are NOT downloaded; no publish, no packaging.
+# CIF-01b-4: Build Manifest steps per design v1.0 (bf7eca51) + errata v1.0.1 (69c93f0c) + v1.0.2 (c96654fd) E7-E9.
+# Step order (E7): Build, Test, Warning count, Generate manifest, Validate manifest, Upload (last four if: always()).
+# Step failures are never masked. The runner label is a single constant line (read by New-BuildManifest.ps1).
 name: ci-windows
 
 on:
@@ -51,10 +54,14 @@ jobs:
         run: dotnet restore DesktopMediaPlayer.sln ${{ matrix.extra }}
 
       - name: Build (Release x64)
+        id: build
         shell: pwsh
-        run: dotnet build DesktopMediaPlayer.sln -c Release --no-restore ${{ matrix.extra }} "-bl:artifacts/build-${{ matrix.flavor }}.binlog" 2>&1 | Tee-Object -FilePath "artifacts/build-${{ matrix.flavor }}.log"; exit $LASTEXITCODE
+        run: |
+          dotnet build DesktopMediaPlayer.sln -c Release --no-restore ${{ matrix.extra }} "-bl:artifacts/build-${{ matrix.flavor }}.binlog" 2>&1 | Tee-Object -FilePath "artifacts/build-${{ matrix.flavor }}.log"
+          $c = $LASTEXITCODE; "code=$c" >> $env:GITHUB_OUTPUT; exit $c
 
       - name: Test (Release x64)
+        id: test
         shell: pwsh
         run: |
           $data = Join-Path $env:RUNNER_TEMP "dmp-appdata-${{ matrix.flavor }}"
@@ -62,7 +69,7 @@ jobs:
           $env:APPDATA = $data
           $env:LOCALAPPDATA = $data
           dotnet test DesktopMediaPlayer.sln -c Release --no-build ${{ matrix.extra }} --logger "trx;LogFileName=test-${{ matrix.flavor }}.trx" --results-directory artifacts/test-results
-          exit $LASTEXITCODE
+          $c = $LASTEXITCODE; "code=$c" >> $env:GITHUB_OUTPUT; exit $c
 
       - name: Warning count (baseline record)
         if: always()
@@ -73,6 +80,29 @@ jobs:
             $w = (Select-String -Path $log -Pattern 'warning [A-Z]+[0-9]+' | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique).Count
             "warnings=$w" | Tee-Object -FilePath "artifacts/warnings-${{ matrix.flavor }}.txt"
           }
+
+      - name: Generate manifest
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Output "pwsh $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion -lt [version]'7.4') { Write-Output "::error::BLOCKED: pwsh $($PSVersionTable.PSVersion) < 7.4 (Test-Json Draft 2020-12)"; exit 3 }
+          ./build/ci/New-BuildManifest.ps1 -Kind ci -Flavor ${{ matrix.flavor }} -Configuration Release -MsbuildExtra '${{ matrix.extra }}' -BuildExitCode '${{ steps.build.outputs.code }}' -TestExitCode '${{ steps.test.outputs.code }}' -OutFile "artifacts/build-manifest-${{ matrix.flavor }}.json"
+          exit $LASTEXITCODE
+
+      - name: Validate manifest
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Output "pwsh $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion -lt [version]'7.4') { Write-Output "::error::BLOCKED: pwsh $($PSVersionTable.PSVersion) < 7.4 (Test-Json Draft 2020-12)"; exit 3 }
+          $mf = "artifacts/build-manifest-${{ matrix.flavor }}.json"
+          if (-not (Test-Path -LiteralPath $mf)) { Write-Output "::error::manifest not found: $mf"; exit 1 }
+          $ok = Test-Json -Json (Get-Content -LiteralPath $mf -Raw) -SchemaFile build/manifest/build-manifest.schema.json
+          if (-not $ok) { Write-Output "::error::Test-Json FAIL: $mf"; exit 3 }
+          Write-Output "Test-Json OK: $mf"
+          ./build/ci/New-BuildManifest.ps1 -CheckManifest $mf
+          exit $LASTEXITCODE
 
       - name: Upload evidence
         if: always()
