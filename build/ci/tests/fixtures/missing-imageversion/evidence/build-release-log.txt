@@ -1,0 +1,2 @@
+SYNTHETIC FIXTURE build log (no warnings)
+Build succeeded.

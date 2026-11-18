@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0",
+  "manifestKind": "ci",
+  "buildId": "CI-1000001-1-release",
+  "flavor": "release",
+  "configuration": "Release",
+  "msbuildProperties": {},
+  "platform": "x64",
+  "targetFramework": "net10.0-windows",
+  "source": {
+    "repository": "fixture-owner/fixture-repo",
+    "event": "pull_request",
+    "ref": "refs/pull/1/merge",
+    "headSha": "1111111111111111111111111111111111111111",
+    "checkoutSha": "448f5dbc0e0e779493164a5b7af7048c7d14923f",
+    "baseSha": "2222222222222222222222222222222222222222",
+    "treeClean": true
+  },
+  "run": {
+    "runId": 1000001,
+    "runAttempt": 1,
+    "jobUrl": "https://github.com/fixture-owner/fixture-repo/actions/runs/1000001",
+    "workflowFile": ".github/workflows/ci-windows.yml",
+    "workflowSha256": "643e056065c9fedf42201ca832b2aedd4b2af5c496c9805ea73f4349155fb72f",
+    "startedAtUtc": "2099-01-01T00:00:00Z",
+    "finishedAtUtc": "2099-01-01T00:00:06.5000000Z"
+  },
+  "toolchain": {
+    "sdkRequested": "10.0.402",
+    "sdkRollForward": "latestPatch",
+    "sdkResolved": "10.0.403",
+    "sdkMatchesRequested": false,
+    "runner": {
+      "os": "Windows",
+      "imageName": "fixture-image-os",
+      "imageVersion": null,
+      "label": "windows-latest"
+    },
+    "actions": [
+      {
+        "name": "actions/checkout",
+        "sha": "11d5960a326750d5838078e36cf38b85af677262",
+        "tag": "v4"
+      },
+      {
+        "name": "actions/setup-dotnet",
+        "sha": "67a3573c9a986a3f9c594539f4ab511d57bb3ce9",
+        "tag": "v4"
+      },
+      {
+        "name": "actions/upload-artifact",
+        "sha": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "tag": "v4"
+      }
+    ]
+  },
+  "tests": {
+    "framework": "executor://xunit/VsTestRunner3/netcore/",
+    "trxFile": "test-results/test-release.trx",
+    "trxSha256": "9dda4006ba9c66cf9e9af2f5242ad581627b2985454b080ad2af3def2b069a03",
+    "total": 3,
+    "executed": 3,
+    "passed": 3,
+    "failed": 0,
+    "notExecuted": 0,
+    "error": 0,
+    "timeout": 0,
+    "aborted": 0,
+    "outcome": "Completed"
+  },
+  "warnings": {
+    "count": 0,
+    "method": "unique-lines regex 'warning [A-Z]+[0-9]+' in build log",
+    "codes": {}
+  },
+  "buildResult": {
+    "exitCode": 0
+  },
+  "testResult": {
+    "exitCode": 0
+  },
+  "artifacts": {
+    "evidenceFiles": [
+      {
+        "path": "build-release-log.txt",
+        "bytes": 59,
+        "sha256": "a52d0aa55458eda08b980d56446085a70f9a44e4cfcc7e7727dce4e4d7cb6846"
+      },
+      {
+        "path": "test-results/test-release.trx",
+        "bytes": 1000,
+        "sha256": "9dda4006ba9c66cf9e9af2f5242ad581627b2985454b080ad2af3def2b069a03"
+      },
+      {
+        "path": "warnings-release.txt",
+        "bytes": 11,
+        "sha256": "cf2313ed36d15e82ab3471ecb37c965e69fbb9a01d4b7a2b1e8024f8ed898e46"
+      }
+    ],
+    "packages": []
+  },
+  "native": {
+    "policy": "no-download; not-in-repo; provenance via native-lock",
+    "lockFile": {
+      "path": "native/win-x64/native-lock.json",
+      "sha256": "23ff87ba11cc889eaef8ca2f776b41887d694744ac398a2055c5977d252e8ced",
+      "bundleBuildId": "BLD-20260905-NATIVE-002"
+    },
+    "trackedBinaryCount": 0,
+    "workspaceDllCount": 0,
+    "verification": {
+      "status": "NOT_APPLICABLE",
+      "reason": "no native DLL in CI"
+    }
+  },
+  "generator": {
+    "script": "build/ci/New-BuildManifest.ps1",
+    "scriptSha256": "fe91d174289960989ecbb2ed08c148744be82589e70b58f165d89d0a4a774be8"
+  },
+  "evidenceClass": "CI",
+  "missingFields": [
+    {
+      "field": "toolchain.runner.imageVersion",
+      "reason": "NOT_PROVIDED_BY_ENV",
+      "detail": "entry 1"
+    },
+    {
+      "field": "toolchain.runner.imageVersion",
+      "reason": "NOT_PROVIDED_BY_ENV",
+      "detail": "entry 2"
+    }
+  ]
+}

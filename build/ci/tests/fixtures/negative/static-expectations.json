@@ -1,0 +1,32 @@
+{
+  "base-valid.manifest.json": {
+    "description": "control: valid ci manifest derived from the normal fixture output",
+    "schemaValid": true,
+    "expectExit": 0,
+    "expectStderr": ""
+  },
+  "null-not-listed.manifest.json": {
+    "description": "E8-3 negative: tests.passed is null but not in missingFields",
+    "schemaValid": true,
+    "expectExit": 2,
+    "expectStderr": "field 'tests.passed' is null but not listed in missingFields"
+  },
+  "listed-has-value.manifest.json": {
+    "description": "E8-3 negative: tests.passed listed in missingFields but has a value",
+    "schemaValid": true,
+    "expectExit": 2,
+    "expectStderr": "missingFields 'tests.passed': listed but has a value"
+  },
+  "buildid-mismatch.manifest.json": {
+    "description": "01b-3 condition: ci buildId != CI-{runId}-{runAttempt}-{flavor}",
+    "schemaValid": true,
+    "expectExit": 2,
+    "expectStderr": "ci buildId mismatch: buildId 'CI-1000001-2-release' != expected 'CI-1000001-1-release'"
+  },
+  "duplicate-field.manifest.json": {
+    "description": "E1/E3 negative: same field listed twice in missingFields",
+    "schemaValid": true,
+    "expectExit": 2,
+    "expectStderr": "missingFields duplicate field 'toolchain.runner.imageVersion'"
+  }
+}

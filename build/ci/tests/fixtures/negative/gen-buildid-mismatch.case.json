@@ -1,0 +1,7 @@
+{
+  "description": "negative (generate): ci with -BuildId that differs from CI-{runId}-{runAttempt}-{flavor} => self-check abnormal exit, no file",
+  "baseCase": "normal",
+  "args": { "BuildId": "CI-1000001-2-release" },
+  "expectExit": 2,
+  "expectStderr": "ci buildId mismatch: buildId 'CI-1000001-2-release' != expected 'CI-1000001-1-release'"
+}

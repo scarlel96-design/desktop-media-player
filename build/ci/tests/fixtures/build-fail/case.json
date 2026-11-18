@@ -1,0 +1,21 @@
+{
+  "description": "E8(b) build fail: ci, diag, workflow_dispatch, build 1, Test step not run => tests.* STEP_NOT_RUN",
+  "kind": "ci",
+  "flavor": "diag",
+  "args": { "Configuration": "Release", "MsbuildExtra": "-p:DmpDiag=true", "BuildExitCode": "1", "TestExitCode": "", "BuildLogFile": "build-diag-log.txt" },
+  "env": {
+    "GITHUB_REPOSITORY": "fixture-owner/fixture-repo", "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/fixture",
+    "GITHUB_SHA": "4444444444444444444444444444444444444444", "GITHUB_RUN_ID": "1000002", "GITHUB_RUN_ATTEMPT": "2",
+    "GITHUB_SERVER_URL": "https://github.com", "GITHUB_WORKFLOW_REF": "fixture-owner/fixture-repo/.github/workflows/ci-windows.yml@refs/heads/fixture",
+    "RUNNER_OS": "Windows", "ImageOS": "fixture-image-os", "ImageVersion": "fixture-image-version"
+  },
+  "dotnetVersion": "10.0.403",
+  "expectExit": 0,
+  "expectMissingFields": [
+    "run.finishedAtUtc:STEP_NOT_RUN",
+    "tests.trxFile:STEP_NOT_RUN", "tests.trxSha256:STEP_NOT_RUN",
+    "tests.total:STEP_NOT_RUN", "tests.executed:STEP_NOT_RUN", "tests.passed:STEP_NOT_RUN", "tests.failed:STEP_NOT_RUN",
+    "tests.notExecuted:STEP_NOT_RUN", "tests.error:STEP_NOT_RUN", "tests.timeout:STEP_NOT_RUN", "tests.aborted:STEP_NOT_RUN",
+    "tests.outcome:STEP_NOT_RUN", "testResult.exitCode:STEP_NOT_RUN"
+  ]
+}
