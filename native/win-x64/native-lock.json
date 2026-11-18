@@ -1,0 +1,234 @@
+{
+  "schemaVersion": "1.0",
+  "bundleBuildId": "BLD-20260905-NATIVE-002",
+  "bundleZip": {
+    "name": "dmp-native-win-x64-BLD-20260905-NATIVE-002.zip",
+    "sha256": "85d84e09ff1c66eeb6daad27a0a7262eca8dc098865fe456ca147a587b413878",
+    "bytes": 29219636
+  },
+  "builtAtUtc": "2026-09-04T18:36Z",
+  "buildToolchain": {
+    "compiler": "x86_64-w64-mingw32-gcc (GCC) 14-posix",
+    "crossFile": "/workspace/native-build/mingw_cross.txt"
+  },
+  "obtainedBy": "built-from-source",
+  "license": {
+    "goal": "LGPL-compatible shared build (no GPL / nonfree FFmpeg; mpv -Dgpl=false)",
+    "ffmpegConfigGpl": 0,
+    "ffmpegConfigNonfree": 0,
+    "ffmpegConfigVersion3": 0,
+    "mpvHaveGpl": 0
+  },
+  "components": [
+    {
+      "name": "ffmpeg",
+      "describe": "n7.1.1",
+      "commit": "db69d06eeeab4f46da15030a80d539efb4503ca8",
+      "sourceUrl": "https://github.com/FFmpeg/FFmpeg.git",
+      "license": "LGPL-2.1-or-later",
+      "purl": "pkg:github/FFmpeg/FFmpeg@db69d06eeeab4f46da15030a80d539efb4503ca8"
+    },
+    {
+      "name": "zlib",
+      "describe": "v1.3.1",
+      "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+      "sourceUrl": "https://github.com/madler/zlib.git",
+      "license": "Zlib",
+      "purl": "pkg:generic/zlib@1.3.1"
+    },
+    {
+      "name": "freetype",
+      "describe": "VER-2-13-3",
+      "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
+      "sourceUrl": "https://gitlab.freedesktop.org/freetype/freetype.git",
+      "license": "FTL",
+      "purl": "pkg:generic/freetype@2.13.3"
+    },
+    {
+      "name": "fribidi",
+      "describe": "v1.0.16",
+      "commit": "68162babff4f39c4e2dc164a5e825af93bda9983",
+      "sourceUrl": "https://github.com/fribidi/fribidi.git",
+      "license": "LGPL-2.1-or-later",
+      "purl": "pkg:generic/fribidi@1.0.16"
+    },
+    {
+      "name": "harfbuzz",
+      "describe": "10.2.0",
+      "commit": "7b27c8edd46c674e01dd226fa9e1aa7549f5c436",
+      "sourceUrl": "https://github.com/harfbuzz/harfbuzz.git",
+      "license": "MIT",
+      "purl": "pkg:generic/harfbuzz@10.2.0"
+    },
+    {
+      "name": "libass",
+      "describe": "0.17.3",
+      "commit": "e46aedea0a0d17da4c4ef49d84b94a7994664ab5",
+      "sourceUrl": "https://github.com/libass/libass.git",
+      "license": "ISC",
+      "purl": "pkg:generic/libass@0.17.3"
+    },
+    {
+      "name": "libplacebo",
+      "describe": "v7.349.0",
+      "commit": "1fd3c7bde7b943fe8985c893310b5269a09b46c5",
+      "sourceUrl": "https://code.videolan.org/videolan/libplacebo.git",
+      "license": "LGPL-2.1-or-later",
+      "purl": "pkg:github/haasn/libplacebo@1fd3c7bde7b943fe8985c893310b5269a09b46c5"
+    },
+    {
+      "name": "mpv",
+      "describe": "v0.40.0",
+      "commit": "e48ac7ce08462f5e33af6ef9deeac6fa87eef01e",
+      "sourceUrl": "https://github.com/mpv-player/mpv.git",
+      "license": "LGPL-2.1-or-later",
+      "purl": "pkg:github/mpv-player/mpv@e48ac7ce08462f5e33af6ef9deeac6fa87eef01e"
+    },
+    {
+      "name": "SPIRV-Cross",
+      "describe": "vulkan-sdk-1.3.296.0",
+      "commit": "65d7393430f6c7bb0c20b6d53250fe04847cc2ae",
+      "sourceUrl": "https://github.com/KhronosGroup/SPIRV-Cross",
+      "license": "Apache-2.0",
+      "purl": "pkg:github/KhronosGroup/SPIRV-Cross@65d7393430f6c7bb0c20b6d53250fe04847cc2ae"
+    },
+    {
+      "name": "shaderc",
+      "describe": "v2024.1",
+      "commit": "47a9387ef5b3600d30d84c71ec77a59dc7db46fa",
+      "sourceUrl": "https://github.com/google/shaderc",
+      "license": "Apache-2.0",
+      "purl": "pkg:github/google/shaderc@47a9387ef5b3600d30d84c71ec77a59dc7db46fa"
+    }
+  ],
+  "files": [
+    {
+      "name": "avcodec-61.dll",
+      "sha256": "3d8ea3716b7edf9c8bd9ac6abe4fd34c966407dcebf57647e65068f88e954cf0",
+      "component": "ffmpeg"
+    },
+    {
+      "name": "avfilter-10.dll",
+      "sha256": "7308f9b0e60b2535d54023a14c18982dc55b2932e5067d382bb1f3bc73ea9515",
+      "component": "ffmpeg"
+    },
+    {
+      "name": "avformat-61.dll",
+      "sha256": "e8846adcef16573d95fcba33906a2a0520548090cf2eaa36f72923d9c4049b22",
+      "component": "ffmpeg"
+    },
+    {
+      "name": "avutil-59.dll",
+      "sha256": "c46986adf99d637880c1eda38babee8b7319c26091081b45b06494f3fca7efe1",
+      "component": "ffmpeg"
+    },
+    {
+      "name": "libSPIRV-Tools-shared.dll",
+      "sha256": "64515c6e324d6842fa2fcc82148ea7c5285cdffd8e6c7bded11ae7be66009e67",
+      "component": "shaderc"
+    },
+    {
+      "name": "libass-9.dll",
+      "sha256": "d2532b3f77e134d83c3b1da280f46b9b7dc8e91490664072234d1e04415a7c0b",
+      "component": "libass"
+    },
+    {
+      "name": "libfreetype-6.dll",
+      "sha256": "7d6fa1f11ec7fa1f10e9aa3045c7ca0f105384aacfa7fea013e7be92372e0ddc",
+      "component": "freetype"
+    },
+    {
+      "name": "libfribidi-0.dll",
+      "sha256": "28858efac562b2edb8061525365f30b7bbe7c7b68244038dfc2fce768c3c384e",
+      "component": "fribidi"
+    },
+    {
+      "name": "libgcc_s_seh-1.dll",
+      "sha256": "172cfdc9d83703ec0a0ca2cee08f6cf2a166b801717ee51a56b3a63b36bc2f83",
+      "component": "UNMAPPED"
+    },
+    {
+      "name": "libharfbuzz-0.dll",
+      "sha256": "24c8734d7f0bacaf544e9ef9aec1b41ee0172be9574addf9b2f32f1313904327",
+      "component": "harfbuzz"
+    },
+    {
+      "name": "libmpv-2.dll",
+      "sha256": "ef8cbb703f38a4198c5c313c34a0c5a34c834e62886826f30d15b8dfb10748f6",
+      "component": "mpv"
+    },
+    {
+      "name": "libplacebo-349.dll",
+      "sha256": "bb836a66fbf23d0fdfc499c06860eeb7c775e3ed7f3fdc164f484dc1555ca13a",
+      "component": "libplacebo"
+    },
+    {
+      "name": "libshaderc_shared.dll",
+      "sha256": "1d4445e3564d033e69ff0777b356a5eca090df5f3dbe35a3de611e49ef524ad3",
+      "component": "shaderc"
+    },
+    {
+      "name": "libspirv-cross-c-shared.dll",
+      "sha256": "fc46049acaacc75a2d2aef54372d770982cc2a1bef0860a02ebd4546849da957",
+      "component": "SPIRV-Cross"
+    },
+    {
+      "name": "libstdc++-6.dll",
+      "sha256": "5fe5d4d8f6636eb6f2dc55be99dc5dc8a6c40db1abdf592e84480d1e6985abd0",
+      "component": "UNMAPPED"
+    },
+    {
+      "name": "libwinpthread-1.dll",
+      "sha256": "fc3cd567190f3f24e8201c2e1602f7d1f1e583a572efb7dbd8746d7928538e94",
+      "component": "UNMAPPED"
+    },
+    {
+      "name": "swresample-5.dll",
+      "sha256": "be4366ca1ebaabc214680e2c5a2e894678eb01abd48e85dd0c120bc52e550005",
+      "component": "ffmpeg"
+    },
+    {
+      "name": "swscale-8.dll",
+      "sha256": "b6411ecca7e5a9ad5519a15d209e20c0db3b650f39e7fc9bdc853fb37dce3698",
+      "component": "ffmpeg"
+    },
+    {
+      "name": "zlib1.dll",
+      "sha256": "b76a6ab53784d28090b6d36cb22c61befecd8e60ab86532cc97eceebb74c009d",
+      "component": "zlib"
+    }
+  ],
+  "evidenceRefs": [
+    {
+      "name": "dmp-native-win-x64-BLD-20260905-NATIVE-002-PROVENANCE.md",
+      "sha256": "5fd386aefaeba255834f0f867448c17925804eecdc48a380d27f08ea8e61ce44"
+    },
+    {
+      "name": "dmp-native-win-x64-BLD-20260905-NATIVE-002-SBOM.json",
+      "sha256": "1185d69a9e89b9536231f1df56ceccd12500c1d6a20b9b7ce53200184fb060e0"
+    },
+    {
+      "name": "dmp-native-win-x64-BLD-20260905-NATIVE-002-DLL-SHA256SUMS.txt",
+      "sha256": "c00e48d966a0b32659fa5382b30148331a6a8b38bdbdac0de01390c3b25e5549"
+    },
+    {
+      "name": "dmp-native-win-x64-BLD-20260905-NATIVE-001-PROVENANCE.md",
+      "sha256": "dc80e9553d9ffe21c22b2aa2d4faaeeb09eec634956ff43ccd7355d1cb286e20"
+    },
+    {
+      "name": "dmp-native-win-x64-BLD-20260905-NATIVE-001-SBOM.json",
+      "sha256": "dd75e86a016927d275d1e0e36c781b2bfa363c57d5eca2c64343c03eb962d687"
+    }
+  ],
+  "knownGaps": [
+    "UNMAPPED: libgcc_s_seh-1.dll, libstdc++-6.dll, libwinpthread-1.dll (mingw runtime; not in PROVENANCE component table and not found in native-build logs).",
+    "purl for zlib, freetype, fribidi, harfbuzz, libass is taken from NATIVE-001 SBOM (same commit as NATIVE-002); NATIVE-002 SBOM has no purl for them.",
+    "sourceUrl for ffmpeg, zlib, mpv, freetype, fribidi, harfbuzz, libass, libplacebo is taken from NATIVE-001 PROVENANCE Remotes (same commit as NATIVE-002); NATIVE-002 records no remote URL.",
+    "libplacebo: NATIVE-002 purl says pkg:github/haasn/libplacebo, NATIVE-001 remote is code.videolan.org; sourceUrl uses the videolan remote and purl keeps the NATIVE-002 value (chief decision 2026-11-18).",
+    "sourceUrl for SPIRV-Cross and shaderc is derived from the NATIVE-002 SBOM pkg:github purl; no recorded remote URL exists for them.",
+    "libSPIRV-Tools-shared.dll is mapped to shaderc because it appears only in shaderc-build.log and shaderc-install.log; SPIRV-Tools has no separate component, commit or license record.",
+    "NATIVE-002-SHA256SUMS.txt lists PROVENANCE.md a4d8b7c3491656c1b5385583847b8dcc0a5d6f1fe863de700cfe620ab8a5ec49 and SBOM.json 94492cdd967bf36cc496785f6c8657353548942c338805796e7f0bd818ccadd4, but the current files hash to the evidenceRefs values; cause UNVERIFIED.",
+    "D3D12VA mismatch between the bundled FFmpeg build log and DLL contents: cause not confirmed (design v1.0 section 1.5).",
+    "mpv commit vs upstream tag v0.40.0 not directly cross-checked: UNVERIFIED (design v1.0 section 1.5)."
+  ]
+}
